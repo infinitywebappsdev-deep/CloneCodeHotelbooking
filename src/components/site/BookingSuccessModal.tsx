@@ -18,6 +18,7 @@ import {
   BedDouble,
 } from "lucide-react";
 import { HOTEL, naira, whatsappLink } from "@/lib/hotel";
+import { PaystackCheckout } from "@/components/site/PaystackCheckout";
 import { toast } from "sonner";
 
 export interface BookingConfirmationDetails {
@@ -211,15 +212,26 @@ export function BookingSuccessModal({
           </div>
         )}
 
+        {/* Paystack Online Payment Integration */}
+        <div className="mt-6">
+          <PaystackCheckout
+            bookingReference={data.reference}
+            amount={totalAmount}
+            guestEmail={data.guestEmail}
+            guestName={data.guestName}
+            roomName={data.roomName}
+          />
+        </div>
+
         {/* Action Buttons */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <a
             href={whatsappLink(whatsappInquiryMsg)}
             target="_blank"
             rel="noreferrer"
             id="modal-whatsapp-confirm-btn"
             onClick={() => toast.success("Opening WhatsApp Concierge verification channel...")}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3.5 text-center text-xs font-semibold tracking-[0.16em] uppercase text-white shadow-md transition-all hover:bg-emerald-700 active:scale-95"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-center text-xs font-semibold tracking-[0.16em] uppercase text-white shadow-md transition-all hover:bg-emerald-700 active:scale-95"
           >
             <Phone className="h-4 w-4" />
             <span>Verify on WhatsApp</span>
@@ -231,11 +243,11 @@ export function BookingSuccessModal({
             target="_blank"
             rel="noreferrer"
             id="modal-paystack-checkout-btn"
-            onClick={() => toast.info("Redirecting to Paystack secure checkout...")}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-center text-xs font-semibold tracking-[0.16em] uppercase text-primary-foreground shadow-md transition-all hover:opacity-90 active:scale-95"
+            onClick={() => toast.info("Redirecting to Paystack payment page...")}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-muted/60 px-6 py-3 text-center text-xs font-semibold tracking-[0.16em] uppercase text-foreground shadow-sm transition-all hover:bg-muted active:scale-95"
           >
             <CreditCard className="h-4 w-4" />
-            <span>Pay Online (Paystack)</span>
+            <span>Direct Paystack Link</span>
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>

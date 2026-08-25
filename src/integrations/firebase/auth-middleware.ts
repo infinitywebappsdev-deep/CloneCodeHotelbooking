@@ -15,9 +15,15 @@ export const requireFirebaseAuth = createMiddleware().server(async ({ next, requ
   try {
     const parts = token.split(".");
     if (parts.length >= 2) {
-      const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
-      userId = payload.user_id || payload.sub || userId;
+      // Decode standard and URL-safe base64 JWT payload with proper padding
+      const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+      const payload = JSON.parse(Buffer.from(padded, "base64").toString("utf-8"));
+      userId = payload.user_id || payload.sub || payload.uid || userId;
       claims = payload;
+      if (payload.email && !claims.email) {
+        claims.email = payload.email;
+      }
     }
   } catch (err) {
     console.warn("Failed to decode token payload:", err);

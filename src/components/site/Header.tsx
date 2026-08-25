@@ -12,6 +12,7 @@ const NAV = [
   { to: "/gallery", label: "Gallery" },
   { to: "/about", label: "About" },
   { to: "/contact", label: "Contact" },
+  { to: "/my-bookings", label: "My Bookings" },
 ] as const;
 
 export function Header() {

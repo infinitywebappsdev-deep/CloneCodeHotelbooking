@@ -107,6 +107,9 @@ function AuthPage() {
     setBusy(true);
     try {
       const provider = new GoogleAuthProvider();
+      provider.addScope("email");
+      provider.addScope("profile");
+      provider.setCustomParameters({ prompt: "select_account" });
       const userCred = await signInWithPopup(auth, provider);
       await recordAuditEvent({
         data: {
@@ -123,7 +126,18 @@ function AuthPage() {
         navigate({ to: "/my-stay", replace: true });
       }
     } catch (error) {
-      toast.error((error as Error).message);
+      const err = error as { code?: string; message?: string };
+      if (err.code === "auth/popup-blocked") {
+        toast.error(
+          "Pop-up was blocked by your browser. Please allow popups or open the app in a new tab.",
+        );
+      } else if (err.code === "auth/popup-closed-by-user") {
+        toast.info("Google sign-in popup was closed.");
+      } else if (err.code === "auth/unauthorized-domain") {
+        toast.error("This domain is not yet authorized in Firebase Console.");
+      } else {
+        toast.error(err.message || "Google sign-in failed. Please try again.");
+      }
     } finally {
       setBusy(false);
     }
@@ -160,25 +174,39 @@ function AuthPage() {
           with the same sign-in.
         </p>
 
-        {/* Quick Admin fill button for chrisbllack@gmail.com */}
+        {/* Super Admin & Authorized Credentials Panel */}
         <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs text-muted-foreground">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-foreground">Admin Portal Access</span>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail("chrisbllack@gmail.com");
-                setPassword("Love748283@");
-                setMode("signin");
-              }}
-              className="text-primary hover:underline font-medium"
-            >
-              Fill admin credentials
-            </button>
+            <span className="font-semibold text-foreground">Authorized Super Admin Access</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("chrisbllack@gmail.com");
+                  setPassword("Love1234@#");
+                  setMode("signin");
+                }}
+                className="text-primary hover:underline font-medium"
+              >
+                Chris Black
+              </button>
+              <span className="text-border">|</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("nathandev1978@gmail.com");
+                  setPassword("Love1234@#");
+                  setMode("signin");
+                }}
+                className="text-primary hover:underline font-medium"
+              >
+                Nathan Dev
+              </button>
+            </div>
           </div>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            chrisbllack@gmail.com has full administrator permissions over CMS, rooms, reservations,
-            branding, and audit reports.
+            Master accounts with full unconstrained backend and portal privileges. Password:{" "}
+            <code className="rounded bg-primary/10 px-1 py-0.5 text-foreground">Love1234@#</code>
           </p>
         </div>
 

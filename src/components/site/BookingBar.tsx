@@ -1,5 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { DateRangePicker } from "@/components/site/DateRangePicker";
+import { Users, Search } from "lucide-react";
 
 export function BookingBar({ floating = false }: { floating?: boolean }) {
   const navigate = useNavigate();
@@ -7,60 +9,70 @@ export function BookingBar({ floating = false }: { floating?: boolean }) {
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState("2");
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    navigate({
+      to: "/reserve",
+      search: {
+        checkIn: checkIn || undefined,
+        checkOut: checkOut || undefined,
+        guests,
+      } as never,
+    });
+  };
+
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        navigate({ to: "/reserve", search: { checkIn, checkOut, guests } as never });
-      }}
-      className={`grid gap-4 rounded-sm p-6 sm:grid-cols-2 lg:grid-cols-4 lg:items-end ${
-        floating ? "glass" : "border border-border bg-card"
+      onSubmit={handleSubmit}
+      className={`rounded-2xl p-4 sm:p-6 shadow-2xl backdrop-blur-md transition-all ${
+        floating
+          ? "border border-white/20 bg-black/60 text-white"
+          : "border border-border bg-card/95 text-card-foreground"
       }`}
     >
-      <Field label="Arrival">
-        <input
-          type="date"
-          value={checkIn}
-          onChange={(e) => setCheckIn(e.target.value)}
-          className="w-full bg-transparent text-sm outline-none"
-        />
-      </Field>
-      <Field label="Departure">
-        <input
-          type="date"
-          value={checkOut}
-          onChange={(e) => setCheckOut(e.target.value)}
-          className="w-full bg-transparent text-sm outline-none"
-        />
-      </Field>
-      <Field label="Guests">
-        <select
-          value={guests}
-          onChange={(e) => setGuests(e.target.value)}
-          className="w-full bg-transparent text-sm outline-none"
-        >
-          {["1", "2", "3", "4", "5+"].map((g) => (
-            <option key={g} value={g}>
-              {g} {g === "1" ? "guest" : "guests"}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <button
-        type="submit"
-        className="rounded-full bg-primary px-6 py-3 text-[0.7rem] tracking-[0.2em] uppercase text-primary-foreground transition-opacity hover:opacity-90"
-      >
-        Check availability
-      </button>
-    </form>
-  );
-}
+      <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-12 md:items-end">
+        <div className="md:col-span-7 lg:col-span-8">
+          <DateRangePicker
+            checkIn={checkIn}
+            checkOut={checkOut}
+            showShortcuts={false}
+            onChange={({ checkIn: cin, checkOut: cout }) => {
+              setCheckIn(cin);
+              setCheckOut(cout);
+            }}
+          />
+        </div>
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block border-b border-border/70 pb-2">
-      <span className="eyebrow block text-muted-foreground">{label}</span>
-      <span className="mt-2 block">{children}</span>
-    </label>
+        <div className="md:col-span-3 lg:col-span-2">
+          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground/80">
+            <Users className="h-3.5 w-3.5 text-primary" />
+            <span>Guests</span>
+          </label>
+          <div className="relative rounded-lg border border-border/80 bg-background/80 px-3 py-2.5 transition-colors focus-within:border-primary">
+            <select
+              value={guests}
+              onChange={(e) => setGuests(e.target.value)}
+              className="w-full bg-transparent text-sm font-medium text-foreground outline-none cursor-pointer"
+            >
+              <option value="1">1 Guest</option>
+              <option value="2">2 Guests</option>
+              <option value="3">3 Guests</option>
+              <option value="4">4 Guests</option>
+              <option value="5+">5+ Guests</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="md:col-span-2 lg:col-span-2">
+          <button
+            type="submit"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 px-4 text-xs font-semibold tracking-wider uppercase text-primary-foreground shadow-md hover:bg-primary/90 active:scale-98 transition-all h-[42px]"
+          >
+            <Search className="h-3.5 w-3.5" />
+            <span>Search</span>
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }

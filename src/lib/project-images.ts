@@ -37,7 +37,8 @@ import hero from "@/assets/hero.jpg";
 import leftsideHotelFront from "@/assets/leftside hotel front.jpg";
 import rightsideHotelFront from "@/assets/rightside hotel front.jpg";
 
-export type ProjectImageCategory = "all" | "rooms" | "lobby" | "dining" | "events" | "exterior";
+export type ProjectImageCategory =
+  "all" | "rooms" | "lobby" | "dining" | "events" | "exterior" | "amenities";
 
 export interface ProjectAsset {
   id: string;
@@ -355,6 +356,42 @@ export const PROJECT_ASSETS: ProjectAsset[] = [
     src: rightsideHotelFront,
     publicPath: "/images/rightside hotel front.jpg",
     tags: ["exterior", "front", "facade", "east"],
+  },
+  {
+    id: "luxury-spa-suite",
+    name: "Luxury Wellness & Spa Suite",
+    category: "amenities",
+    categoryLabel: "Spa & Amenities",
+    src: "/images/luxury-spa.jpg",
+    publicPath: "/images/luxury-spa.jpg",
+    tags: ["spa", "wellness", "massage", "amenities", "relaxation"],
+  },
+  {
+    id: "swimming-pool-resort",
+    name: "Resort Swimming Pool & Cabanas",
+    category: "amenities",
+    categoryLabel: "Spa & Amenities",
+    src: "/images/swimming-pool.jpg",
+    publicPath: "/images/swimming-pool.jpg",
+    tags: ["pool", "swimming", "cabana", "outdoor", "sunset", "amenities"],
+  },
+  {
+    id: "chef-cuisine-special",
+    name: "Chef's Signature Plated Cuisine",
+    category: "dining",
+    categoryLabel: "Dining & Bars",
+    src: "/images/chef-cuisine.jpg",
+    publicPath: "/images/chef-cuisine.jpg",
+    tags: ["dining", "gourmet", "food", "chef", "restaurant"],
+  },
+  {
+    id: "cocktail-lounge-bar",
+    name: "Artisanal Cocktail & Spirit Bar",
+    category: "dining",
+    categoryLabel: "Dining & Bars",
+    src: "/images/cocktail-lounge.jpg",
+    publicPath: "/images/cocktail-lounge.jpg",
+    tags: ["bar", "cocktails", "lounge", "spirits", "drinks"],
   },
 ];
 

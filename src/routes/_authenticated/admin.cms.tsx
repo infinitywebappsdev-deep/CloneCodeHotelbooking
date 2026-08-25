@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useId } from "react";
 import {
   cmsLoad,
   savePage,
@@ -10,6 +10,14 @@ import {
   deleteGalleryImage,
   createPage,
   deletePage,
+  savePageDraft,
+  publishPage,
+  listPageVersions,
+  rollbackPage,
+  listPosts,
+  savePost,
+  createPost,
+  deletePost,
   listMenuItems,
   saveMenuItem,
   deleteMenuItem,
@@ -19,6 +27,9 @@ import {
   listAdminTestimonials,
   moderateTestimonial,
   deleteAdminTestimonial,
+  getSiteSections,
+  saveSiteSection,
+  DEFAULT_POST_CATEGORIES,
 } from "@/lib/cms.functions";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,8 +54,39 @@ import {
   Search,
   Archive,
   Check,
+  FileText,
+  Newspaper,
+  Layout,
+  Sparkles,
+  Plus,
+  Edit,
+  ExternalLink,
+  Eye,
+  Calendar,
+  User,
+  History,
+  RotateCcw,
+  Sliders,
+  FolderOpen,
+  Upload,
+  Video,
+  Bold,
+  Italic,
+  List,
+  Quote,
+  Heading2,
+  Heading3,
+  Globe,
+  Share2,
+  Maximize2,
+  ChevronRight,
+  Info,
 } from "lucide-react";
-import { MediaImagePicker, MediaLibraryBrowser } from "@/components/admin/MediaImagePicker";
+import {
+  MediaImagePicker,
+  MediaLibraryBrowser,
+  type MediaItem,
+} from "@/components/admin/MediaImagePicker";
 import {
   listContactSubmissions,
   updateContactStatus,
@@ -65,11 +107,37 @@ type Page = {
   title: string;
   subtitle: string;
   body: string;
+  featured_image?: string;
+  featured_video?: string;
+  template?: "standard" | "hero" | "split" | "fullwidth";
   meta_description: string;
   nav_label: string;
   sort_order: number;
   published: boolean;
 };
+
+type Post = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  body: string;
+  featured_image: string;
+  featured_video?: string;
+  category: string;
+  tags?: string[];
+  author_name: string;
+  author_avatar?: string;
+  status: "published" | "draft" | "scheduled";
+  published_at: string;
+  meta_title?: string;
+  meta_description?: string;
+  read_time?: string;
+  views_count?: number;
+  sort_order?: number;
+  published?: boolean;
+};
+
 type Faq = { id: string; question: string; answer: string; sort_order: number; published: boolean };
 type Image = {
   id: string;
@@ -85,35 +153,1540 @@ function CmsPage() {
   const { data, isLoading } = useQuery({ queryKey: ["cms"], queryFn: () => cmsLoad() });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["cms"] });
 
-  if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading content…</p>;
+  const [activeSubTab, setActiveSubTab] = useState<string>("posts");
+
+  if (isLoading || !data) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-sm text-muted-foreground animate-pulse">
+          Loading WordPress-Grade CMS Dashboard…
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <Tabs defaultValue="pages" className="space-y-4">
-      <TabsList className="grid grid-cols-4 sm:grid-cols-8 gap-1 h-auto p-1">
-        <TabsTrigger value="pages">Pages</TabsTrigger>
-        <TabsTrigger value="gallery">Gallery</TabsTrigger>
-        <TabsTrigger value="media" className="gap-1">
-          <Images className="h-3.5 w-3.5" />
-          Media Library
-        </TabsTrigger>
-        <TabsTrigger value="faqs">FAQs</TabsTrigger>
-        <TabsTrigger value="menu">F&B Menu</TabsTrigger>
-        <TabsTrigger value="coupons">Vouchers</TabsTrigger>
-        <TabsTrigger value="reviews">Reviews</TabsTrigger>
-        <TabsTrigger value="inquiries" className="gap-1">
-          <Mail className="h-3.5 w-3.5" />
-          Inquiries
-        </TabsTrigger>
-      </TabsList>
+    <div className="space-y-6">
+      {/* WordPress-like Header Bar */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg bg-primary/10 p-2 text-primary">
+              <Layout className="h-5 w-5" />
+            </span>
+            <h1 className="font-serif text-2xl font-semibold tracking-tight">
+              Website Content Management
+            </h1>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Manage all website pages, news articles &amp; blog posts, media library
+            photography/videos, menus, and global content.
+          </p>
+        </div>
 
-      <TabsContent value="pages" className="space-y-4">
-        <NewPage onSaved={refresh} />
-        {(data.pages as Page[]).map((page) => (
-          <PageEditor key={page.id} page={page} onSaved={refresh} />
-        ))}
-      </TabsContent>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/"
+            target="_blank"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            <Globe className="h-3.5 w-3.5 text-primary" />
+            View Live Site
+          </Link>
+        </div>
+      </div>
 
-      <TabsContent value="gallery" className="space-y-4">
+      {/* Main Tabs Navigation */}
+      <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="space-y-4">
+        <TabsList className="flex flex-wrap h-auto p-1.5 gap-1 bg-muted/70 rounded-xl border">
+          <TabsTrigger value="posts" className="gap-1.5 text-xs">
+            <Newspaper className="h-3.5 w-3.5 text-primary" />
+            Posts &amp; News ({(data.posts as Post[])?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="pages" className="gap-1.5 text-xs">
+            <FileText className="h-3.5 w-3.5 text-blue-600" />
+            Pages ({(data.pages as Page[])?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="media" className="gap-1.5 text-xs">
+            <Images className="h-3.5 w-3.5 text-emerald-600" />
+            Media Library
+          </TabsTrigger>
+          <TabsTrigger value="customizer" className="gap-1.5 text-xs">
+            <Sliders className="h-3.5 w-3.5 text-amber-600" />
+            Site Customizer
+          </TabsTrigger>
+          <TabsTrigger value="gallery" className="gap-1.5 text-xs">
+            <Images className="h-3.5 w-3.5" />
+            Gallery
+          </TabsTrigger>
+          <TabsTrigger value="menu" className="gap-1.5 text-xs">
+            <Utensils className="h-3.5 w-3.5 text-orange-600" />
+            F&amp;B Menu
+          </TabsTrigger>
+          <TabsTrigger value="faqs" className="gap-1.5 text-xs">
+            <MessageSquare className="h-3.5 w-3.5" />
+            FAQs
+          </TabsTrigger>
+          <TabsTrigger value="coupons" className="gap-1.5 text-xs">
+            <Tag className="h-3.5 w-3.5 text-purple-600" />
+            Vouchers
+          </TabsTrigger>
+          <TabsTrigger value="reviews" className="gap-1.5 text-xs">
+            <Star className="h-3.5 w-3.5 text-amber-500" />
+            Reviews
+          </TabsTrigger>
+          <TabsTrigger value="inquiries" className="gap-1.5 text-xs">
+            <Mail className="h-3.5 w-3.5 text-cyan-600" />
+            Inquiries
+          </TabsTrigger>
+        </TabsList>
+
+        {/* TAB: POSTS & ARTICLES */}
+        <TabsContent value="posts" className="space-y-4">
+          <PostsManager posts={data.posts as Post[]} onSaved={refresh} />
+        </TabsContent>
+
+        {/* TAB: PAGES */}
+        <TabsContent value="pages" className="space-y-4">
+          <PagesManager pages={data.pages as Page[]} onSaved={refresh} />
+        </TabsContent>
+
+        {/* TAB: MEDIA LIBRARY */}
+        <TabsContent value="media" className="space-y-4">
+          <Card className="p-5">
+            <div className="mb-4">
+              <h2 className="text-base font-serif font-semibold">
+                Media Library &amp; Asset Folders
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Upload new photography or videos from your computer, organize assets into folders,
+                copy asset links, or paste YouTube links.
+              </p>
+            </div>
+            <MediaLibraryBrowser />
+          </Card>
+        </TabsContent>
+
+        {/* TAB: SITE CUSTOMIZER */}
+        <TabsContent value="customizer" className="space-y-4">
+          <SiteSectionsManager onSaved={refresh} />
+        </TabsContent>
+
+        {/* TAB: GALLERY */}
+        <TabsContent value="gallery" className="space-y-4">
+          <GalleryManager gallery={data.gallery as Image[]} onSaved={refresh} />
+        </TabsContent>
+
+        {/* TAB: F&B MENU */}
+        <TabsContent value="menu" className="space-y-4">
+          <MenuManager />
+        </TabsContent>
+
+        {/* TAB: FAQS */}
+        <TabsContent value="faqs" className="space-y-4">
+          <FaqsManager faqs={data.faqs as Faq[]} onSaved={refresh} />
+        </TabsContent>
+
+        {/* TAB: COUPONS */}
+        <TabsContent value="coupons" className="space-y-4">
+          <CouponManager />
+        </TabsContent>
+
+        {/* TAB: REVIEWS */}
+        <TabsContent value="reviews" className="space-y-4">
+          <ReviewsModerator />
+        </TabsContent>
+
+        {/* TAB: INQUIRIES */}
+        <TabsContent value="inquiries" className="space-y-4">
+          <ContactInquiriesModerator />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+/* =========================================================================
+   1. POSTS & ARTICLES MANAGER (WordPress Posts)
+   ========================================================================= */
+
+function PostsManager({ posts, onSaved }: { posts: Post[]; onSaved: () => void }) {
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  const filteredPosts = (posts || []).filter((p) => {
+    const matchesSearch =
+      !searchQuery.trim() ||
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.excerpt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.slug.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "published" && (p.status === "published" || p.published !== false)) ||
+      (statusFilter === "draft" && (p.status === "draft" || p.published === false));
+    const matchesCategory = categoryFilter === "all" || p.category === categoryFilter;
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
+
+  if (isCreatingNew || editingPost) {
+    return (
+      <PostEditor
+        post={
+          editingPost || {
+            id: "",
+            slug: "",
+            title: "",
+            excerpt: "",
+            body: "",
+            featured_image: "/images/BankyHall.jpg",
+            category: "Hotel News",
+            tags: ["news", "hotel"],
+            author_name: "Banky Hotel Editorial",
+            status: "published",
+            published_at: new Date().toISOString(),
+            meta_title: "",
+            meta_description: "",
+            read_time: "3 min read",
+            published: true,
+          }
+        }
+        isNew={isCreatingNew}
+        onSaved={() => {
+          setIsCreatingNew(false);
+          setEditingPost(null);
+          onSaved();
+        }}
+        onCancel={() => {
+          setIsCreatingNew(false);
+          setEditingPost(null);
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Action Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setIsCreatingNew(true)} className="gap-1.5 text-xs shadow">
+            <Plus className="h-4 w-4" />
+            Add New Post
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Total {filteredPosts.length} article(s)
+          </span>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search posts…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 pl-8 text-xs w-44 sm:w-56"
+            />
+          </div>
+
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs"
+          >
+            <option value="all">All Categories</option>
+            {DEFAULT_POST_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as never)}
+            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs"
+          >
+            <option value="all">All Statuses</option>
+            <option value="published">Published</option>
+            <option value="draft">Drafts</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Posts Table */}
+      {filteredPosts.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center p-12 text-center">
+          <Newspaper className="h-10 w-10 text-muted-foreground opacity-30 mb-2" />
+          <p className="text-sm font-medium">No posts found</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Create an announcement, news update, or event promotion article.
+          </p>
+          <Button size="sm" onClick={() => setIsCreatingNew(true)} className="mt-4 gap-1 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            Write First Post
+          </Button>
+        </Card>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border/70 bg-card">
+          <table className="w-full text-left text-xs">
+            <thead className="border-b bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="p-3 font-medium">Post Title</th>
+                <th className="p-3 font-medium">Category</th>
+                <th className="p-3 font-medium">Author</th>
+                <th className="p-3 font-medium">Status</th>
+                <th className="p-3 font-medium">Date</th>
+                <th className="p-3 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {filteredPosts.map((post) => (
+                <tr key={post.id || post.slug} className="hover:bg-muted/40 transition-colors">
+                  <td className="p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-14 shrink-0 overflow-hidden rounded bg-muted">
+                        <img
+                          src={post.featured_image || "/images/BankyHall.jpg"}
+                          alt={post.title}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p
+                          className="font-medium text-foreground truncate max-w-sm"
+                          title={post.title}
+                        >
+                          {post.title}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground font-mono truncate">
+                          /p/{post.slug}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <Badge variant="outline" className="text-[10px]">
+                      {post.category || "Hotel News"}
+                    </Badge>
+                  </td>
+                  <td className="p-3 text-muted-foreground">{post.author_name || "Editorial"}</td>
+                  <td className="p-3">
+                    {post.status === "published" || post.published !== false ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
+                        <Check className="h-3 w-3" />
+                        Published
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        Draft
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3 text-muted-foreground">
+                    {post.published_at
+                      ? new Date(post.published_at).toLocaleDateString()
+                      : "Recent"}
+                  </td>
+                  <td className="p-3 text-right space-x-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => setEditingPost(post)}
+                    >
+                      <Edit className="h-3 w-3" />
+                      Edit
+                    </Button>
+                    <Link
+                      to={`/p/${post.slug}`}
+                      target="_blank"
+                      className="inline-flex h-7 items-center justify-center rounded-md border border-input bg-background px-2 text-xs hover:bg-accent hover:text-accent-foreground"
+                      title="View Live Article"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostEditor({
+  post,
+  isNew,
+  onSaved,
+  onCancel,
+}: {
+  post: Post;
+  isNew: boolean;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(post);
+  const [previewMode, setPreviewMode] = useState<"edit" | "split" | "preview">("edit");
+  const [tagInput, setTagInput] = useState("");
+
+  const saveMut = useMutation({
+    mutationFn: () => {
+      const dataToSave = {
+        title: draft.title,
+        slug: draft.slug,
+        excerpt: draft.excerpt || "",
+        body: draft.body || "",
+        featured_image: draft.featured_image || "",
+        featured_video: draft.featured_video || "",
+        category: draft.category || "Hotel News",
+        tags: draft.tags || [],
+        author_name: draft.author_name || "Banky Hotel Editorial",
+        author_avatar: draft.author_avatar || "",
+        status: draft.status || "published",
+        published_at: draft.published_at || new Date().toISOString(),
+        meta_title: draft.meta_title || draft.title,
+        meta_description: draft.meta_description || draft.excerpt || "",
+        read_time: draft.read_time || "3 min read",
+        sort_order: Number(draft.sort_order ?? 0),
+        published: draft.status === "published",
+      };
+
+      if (isNew || !draft.id) {
+        return createPost({ data: dataToSave });
+      } else {
+        return savePost({ data: { id: draft.id, ...dataToSave } });
+      }
+    },
+    onSuccess: () => {
+      toast.success(isNew ? "Post published successfully!" : "Post updated successfully!");
+      onSaved();
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: () => deletePost({ data: { id: draft.id } }),
+    onSuccess: () => {
+      toast.success("Post deleted.");
+      onSaved();
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  function insertFormatting(prefix: string, suffix = "") {
+    const textarea = document.getElementById("post-body-textarea") as HTMLTextAreaElement;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = draft.body.substring(start, end) || "text";
+    const replacement = `${prefix}${selected}${suffix}`;
+    const newBody = draft.body.substring(0, start) + replacement + draft.body.substring(end);
+    setDraft({ ...draft, body: newBody });
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Top action bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onCancel} className="text-xs">
+            ← Back to Posts
+          </Button>
+          <span className="text-sm font-semibold font-serif">
+            {isNew ? "Write New Post" : `Editing: ${draft.title}`}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-border/70 p-0.5 bg-muted/40">
+            <button
+              type="button"
+              onClick={() => setPreviewMode("edit")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                previewMode === "edit"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              }`}
+            >
+              Editor
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewMode("split")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                previewMode === "split"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              }`}
+            >
+              Split View
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewMode("preview")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                previewMode === "preview"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              }`}
+            >
+              Live Preview
+            </button>
+          </div>
+
+          {!isNew && draft.id && (
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-8 text-xs"
+              onClick={() => {
+                if (confirm(`Delete post "${draft.title}"?`)) {
+                  deleteMut.mutate();
+                }
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+
+          <Button
+            size="sm"
+            onClick={() => saveMut.mutate()}
+            disabled={saveMut.isPending || !draft.title.trim() || !draft.slug.trim()}
+            className="gap-1.5 text-xs shadow-md"
+          >
+            <Check className="h-4 w-4" />
+            {saveMut.isPending
+              ? "Saving…"
+              : draft.status === "published"
+                ? "Publish Post"
+                : "Save Draft"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Grid: Content Column + Sidebar */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Left / Center Content Column */}
+        <div
+          className={
+            previewMode === "preview"
+              ? "lg:col-span-12"
+              : previewMode === "split"
+                ? "lg:col-span-8 space-y-4"
+                : "lg:col-span-8 space-y-4"
+          }
+        >
+          {previewMode !== "preview" && (
+            <Card className="p-5 space-y-4">
+              {/* Title & Slug */}
+              <div>
+                <Label className="text-xs font-semibold">Post Title</Label>
+                <Input
+                  placeholder="Enter a compelling headline (e.g. Banky Hall 2026 Wedding Specials)…"
+                  value={draft.title}
+                  onChange={(e) => {
+                    const newTitle = e.target.value;
+                    const autoSlug = isNew
+                      ? newTitle
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]+/g, "-")
+                          .replace(/^-|-$/g, "")
+                      : draft.slug;
+                    setDraft({ ...draft, title: newTitle, slug: autoSlug });
+                  }}
+                  className="font-serif text-lg font-medium"
+                />
+              </div>
+
+              {/* Slug / Permalinks */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground font-mono">Permalink: /p/</span>
+                <Input
+                  value={draft.slug}
+                  onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
+                  className="h-7 text-xs font-mono max-w-sm"
+                  placeholder="post-slug-url"
+                />
+              </div>
+
+              {/* Excerpt / Subtitle */}
+              <div>
+                <Label className="text-xs font-semibold">Post Excerpt / Summary</Label>
+                <Textarea
+                  rows={2}
+                  placeholder="A short, engaging teaser for social feeds and cards…"
+                  value={draft.excerpt}
+                  onChange={(e) => setDraft({ ...draft, excerpt: e.target.value })}
+                  className="text-xs"
+                />
+              </div>
+
+              {/* Rich Body Toolbar */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">
+                    Article Content (Markdown &amp; Rich Media)
+                  </Label>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 bg-muted/60 p-1.5 text-xs">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => insertFormatting("### ")}
+                    title="Heading 2"
+                  >
+                    <Heading2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => insertFormatting("#### ")}
+                    title="Heading 3"
+                  >
+                    <Heading3 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 font-bold"
+                    onClick={() => insertFormatting("**", "**")}
+                    title="Bold"
+                  >
+                    <Bold className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 italic"
+                    onClick={() => insertFormatting("*", "*")}
+                    title="Italic"
+                  >
+                    <Italic className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => insertFormatting("* ")}
+                    title="Bullet list"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => insertFormatting("> ")}
+                    title="Quote callout"
+                  >
+                    <Quote className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => insertFormatting("\n---\n")}
+                    title="Horizontal divider"
+                  >
+                    Divider
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-primary font-medium"
+                    onClick={() => insertFormatting("[Reserve Now](/reserve)")}
+                    title="Call to action button link"
+                  >
+                    + Button Link
+                  </Button>
+                </div>
+
+                <Textarea
+                  id="post-body-textarea"
+                  rows={14}
+                  placeholder="Write your article here using Markdown formatting. Embed images, list hotel amenities, or add testimonials…"
+                  value={draft.body}
+                  onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+                  className="rounded-t-none font-mono text-xs leading-relaxed"
+                />
+              </div>
+            </Card>
+          )}
+
+          {/* Split / Live Preview Pane */}
+          {(previewMode === "split" || previewMode === "preview") && (
+            <Card className="p-6 space-y-4 bg-background border border-primary/20">
+              <div className="flex items-center justify-between border-b pb-2">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary flex items-center gap-1">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Live Article Preview
+                </span>
+                <span className="text-xs text-muted-foreground font-mono">
+                  /p/{draft.slug || "slug"}
+                </span>
+              </div>
+
+              {/* Cover */}
+              {draft.featured_image && (
+                <div className="aspect-video max-h-72 w-full overflow-hidden rounded-xl bg-muted">
+                  <img
+                    src={draft.featured_image}
+                    alt={draft.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+
+              {/* Header */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    {draft.category}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    • {draft.read_time || "3 min read"}
+                  </span>
+                </div>
+                <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-foreground">
+                  {draft.title || "Untitled Article"}
+                </h1>
+                {draft.excerpt && (
+                  <p className="text-sm text-muted-foreground font-light leading-relaxed">
+                    {draft.excerpt}
+                  </p>
+                )}
+              </div>
+
+              {/* Body rendering */}
+              <div className="prose prose-sm max-w-none space-y-3 pt-2 text-sm text-foreground/90 leading-relaxed">
+                {draft.body
+                  .split(/\n{2,}/)
+                  .filter(Boolean)
+                  .map((para, i) => {
+                    if (para.startsWith("### ")) {
+                      return (
+                        <h3
+                          key={i}
+                          className="font-serif text-lg font-semibold mt-4 text-foreground"
+                        >
+                          {para.replace("### ", "")}
+                        </h3>
+                      );
+                    }
+                    if (para.startsWith("#### ")) {
+                      return (
+                        <h4
+                          key={i}
+                          className="font-serif text-base font-semibold mt-3 text-foreground"
+                        >
+                          {para.replace("#### ", "")}
+                        </h4>
+                      );
+                    }
+                    if (para.startsWith("> ")) {
+                      return (
+                        <blockquote
+                          key={i}
+                          className="border-l-2 border-primary pl-4 italic text-muted-foreground my-3"
+                        >
+                          {para.replace("> ", "")}
+                        </blockquote>
+                      );
+                    }
+                    if (para.startsWith("* ") || para.startsWith("- ")) {
+                      const items = para.split(/\n/).map((line) => line.replace(/^[-*]\s+/, ""));
+                      return (
+                        <ul key={i} className="list-disc list-inside space-y-1 my-2">
+                          {items.map((item, idx) => (
+                            <li key={idx}>{item}</li>
+                          ))}
+                        </ul>
+                      );
+                    }
+                    return <p key={i}>{para}</p>;
+                  })}
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Right Sidebar (Settings, Media, Category, SEO) */}
+        {previewMode !== "preview" && (
+          <div className="lg:col-span-4 space-y-4">
+            {/* Publishing Box */}
+            <Card className="p-4 space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Publishing &amp; Status
+              </h3>
+
+              <div>
+                <Label className="text-xs">Post Status</Label>
+                <select
+                  value={draft.status}
+                  onChange={(e) =>
+                    setDraft({ ...draft, status: e.target.value as "published" | "draft" })
+                  }
+                  className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs font-medium"
+                >
+                  <option value="published">🟢 Published (Live for Guests)</option>
+                  <option value="draft">⚪ Draft (Hidden)</option>
+                </select>
+              </div>
+
+              <div>
+                <Label className="text-xs">Category</Label>
+                <select
+                  value={draft.category}
+                  onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                  className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs"
+                >
+                  {DEFAULT_POST_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label className="text-xs">Author Name</Label>
+                <Input
+                  value={draft.author_name}
+                  onChange={(e) => setDraft({ ...draft, author_name: e.target.value })}
+                  className="h-8 text-xs"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs">Estimated Reading Time</Label>
+                <Input
+                  value={draft.read_time}
+                  onChange={(e) => setDraft({ ...draft, read_time: e.target.value })}
+                  className="h-8 text-xs"
+                  placeholder="e.g. 4 min read"
+                />
+              </div>
+            </Card>
+
+            {/* Featured Media Picker */}
+            <Card className="p-4 space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Featured Cover Image &amp; Video
+              </h3>
+              <MediaImagePicker
+                value={draft.featured_image}
+                onChange={(url) => setDraft({ ...draft, featured_image: url })}
+                label="Featured Cover Media"
+                description="Pick from hotel photography, upload from PC, or paste video."
+              />
+            </Card>
+
+            {/* Tags */}
+            <Card className="p-4 space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Tags &amp; Keywords
+              </h3>
+              <div className="flex flex-wrap gap-1">
+                {(draft.tags || []).map((t, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px]"
+                  >
+                    #{t}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDraft({ ...draft, tags: draft.tags?.filter((_, i) => i !== idx) })
+                      }
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add tag and press enter…"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && tagInput.trim()) {
+                      e.preventDefault();
+                      const clean = tagInput
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]/g, "");
+                      if (!draft.tags?.includes(clean)) {
+                        setDraft({ ...draft, tags: [...(draft.tags || []), clean] });
+                      }
+                      setTagInput("");
+                    }
+                  }}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </Card>
+
+            {/* SEO Settings */}
+            <Card className="p-4 space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Search Engine Optimization (SEO)
+              </h3>
+              <div>
+                <Label className="text-xs">Meta Title</Label>
+                <Input
+                  value={draft.meta_title || ""}
+                  onChange={(e) => setDraft({ ...draft, meta_title: e.target.value })}
+                  placeholder={draft.title || "Title tag…"}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Meta Description</Label>
+                <Textarea
+                  rows={2}
+                  value={draft.meta_description || ""}
+                  onChange={(e) => setDraft({ ...draft, meta_description: e.target.value })}
+                  placeholder="Summary snippet displayed in Google search results…"
+                  className="text-xs"
+                />
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   2. PAGES MANAGER (WordPress Pages)
+   ========================================================================= */
+
+function PagesManager({ pages, onSaved }: { pages: Page[]; onSaved: () => void }) {
+  const [editingPage, setEditingPage] = useState<Page | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+
+  if (isCreatingNew || editingPage) {
+    return (
+      <PageFullEditor
+        page={
+          editingPage || {
+            id: "",
+            slug: "",
+            title: "",
+            subtitle: "",
+            body: "",
+            featured_image: "/images/hero.jpg",
+            template: "standard",
+            meta_description: "",
+            nav_label: "",
+            sort_order: 10,
+            published: true,
+          }
+        }
+        isNew={isCreatingNew}
+        onSaved={() => {
+          setIsCreatingNew(false);
+          setEditingPage(null);
+          onSaved();
+        }}
+        onCancel={() => {
+          setIsCreatingNew(false);
+          setEditingPage(null);
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <Button onClick={() => setIsCreatingNew(true)} className="gap-1.5 text-xs shadow">
+          <Plus className="h-4 w-4" />
+          Create New Page
+        </Button>
+        <span className="text-xs text-muted-foreground">Total {pages.length} custom page(s)</span>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border/70 bg-card">
+        <table className="w-full text-left text-xs">
+          <thead className="border-b bg-muted/50 text-muted-foreground">
+            <tr>
+              <th className="p-3 font-medium">Page Title</th>
+              <th className="p-3 font-medium">Web Address</th>
+              <th className="p-3 font-medium">Menu Label</th>
+              <th className="p-3 font-medium">Status</th>
+              <th className="p-3 font-medium">Order</th>
+              <th className="p-3 font-medium text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/60">
+            {pages.map((page) => (
+              <tr key={page.id || page.slug} className="hover:bg-muted/40 transition-colors">
+                <td className="p-3 font-medium text-foreground">{page.title}</td>
+                <td className="p-3 font-mono text-muted-foreground">/p/{page.slug}</td>
+                <td className="p-3">
+                  {page.nav_label ? (
+                    <Badge variant="outline" className="text-[10px]">
+                      {page.nav_label}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground text-[10px]">Hidden from menu</span>
+                  )}
+                </td>
+                <td className="p-3">
+                  {page.published !== false ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
+                      <Check className="h-3 w-3" /> Published
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      Draft
+                    </span>
+                  )}
+                </td>
+                <td className="p-3 text-muted-foreground">{page.sort_order ?? 0}</td>
+                <td className="p-3 text-right space-x-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => setEditingPage(page)}
+                  >
+                    <Edit className="h-3 w-3" />
+                    Edit
+                  </Button>
+                  <Link
+                    to={`/p/${page.slug}`}
+                    target="_blank"
+                    className="inline-flex h-7 items-center justify-center rounded-md border border-input bg-background px-2 text-xs hover:bg-accent hover:text-accent-foreground"
+                    title="View Live Page"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function PageFullEditor({
+  page,
+  isNew,
+  onSaved,
+  onCancel,
+}: {
+  page: Page;
+  isNew: boolean;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(page);
+  const [showVersions, setShowVersions] = useState(false);
+
+  const { data: versions = [] } = useQuery({
+    queryKey: ["page-versions", draft.id],
+    queryFn: () =>
+      draft.id ? listPageVersions({ data: { pageId: draft.id } }) : Promise.resolve([]),
+    enabled: !!draft.id,
+  });
+
+  const saveMut = useMutation({
+    mutationFn: () => {
+      const dataToSave = {
+        title: draft.title,
+        subtitle: draft.subtitle || "",
+        body: draft.body || "",
+        featured_image: draft.featured_image || "",
+        featured_video: draft.featured_video || "",
+        template: draft.template || "standard",
+        meta_description: draft.meta_description || "",
+        nav_label: draft.nav_label || "",
+        sort_order: Number(draft.sort_order ?? 0),
+        published: draft.published ?? true,
+      };
+
+      if (isNew || !draft.id) {
+        return createPage({ data: { slug: draft.slug, ...dataToSave } });
+      } else {
+        return savePage({ data: { id: draft.id, ...dataToSave } });
+      }
+    },
+    onSuccess: () => {
+      toast.success(isNew ? "Page created and published!" : "Page published.");
+      onSaved();
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: () => deletePage({ data: { id: draft.id } }),
+    onSuccess: () => {
+      toast.success("Page removed.");
+      onSaved();
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Action Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onCancel} className="text-xs">
+            ← Back to Pages
+          </Button>
+          <span className="text-sm font-semibold font-serif">
+            {isNew ? "New Page" : `Editing: ${draft.title}`}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {!isNew && draft.id && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowVersions(!showVersions)}
+                className="gap-1 text-xs"
+              >
+                <History className="h-3.5 w-3.5" />
+                History ({versions.length})
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-8 text-xs"
+                onClick={() => {
+                  if (confirm(`Delete page /p/${draft.slug}?`)) {
+                    deleteMut.mutate();
+                  }
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
+
+          <Button
+            size="sm"
+            onClick={() => saveMut.mutate()}
+            disabled={saveMut.isPending || !draft.title.trim() || !draft.slug.trim()}
+            className="gap-1.5 text-xs shadow-md"
+          >
+            <Check className="h-4 w-4" />
+            {saveMut.isPending ? "Publishing…" : "Publish Page"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Main Content */}
+        <div className="lg:col-span-8 space-y-4">
+          <Card className="p-5 space-y-4">
+            <div>
+              <Label className="text-xs font-semibold">Page Title</Label>
+              <Input
+                placeholder="e.g. Wellness Spa &amp; Pool, Executive Conference Packages…"
+                value={draft.title}
+                onChange={(e) => {
+                  const newTitle = e.target.value;
+                  const autoSlug = isNew
+                    ? newTitle
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/^-|-$/g, "")
+                    : draft.slug;
+                  setDraft({ ...draft, title: newTitle, slug: autoSlug });
+                }}
+                className="font-serif text-lg"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground font-mono">Web Route: /p/</span>
+              <Input
+                value={draft.slug}
+                onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
+                className="h-7 text-xs font-mono max-w-sm"
+                placeholder="page-slug"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Subtitle / Hero Banner Copy</Label>
+              <Input
+                placeholder="Introductory subtitle displayed on top hero…"
+                value={draft.subtitle}
+                onChange={(e) => setDraft({ ...draft, subtitle: e.target.value })}
+                className="text-xs"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Page Body Content</Label>
+              <Textarea
+                rows={12}
+                placeholder="Enter rich paragraph content, amenities breakdown, policies, or hospitality descriptions…"
+                value={draft.body}
+                onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+                className="font-mono text-xs leading-relaxed"
+              />
+            </div>
+          </Card>
+
+          {/* Live Preview Card */}
+          <Card className="p-6 bg-background border border-primary/20 space-y-3">
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                Preview
+              </span>
+              <span className="text-xs text-muted-foreground font-mono">/p/{draft.slug}</span>
+            </div>
+            <h2 className="font-serif text-2xl">{draft.title || "Page Title"}</h2>
+            <p className="text-xs text-muted-foreground">{draft.subtitle}</p>
+            <div className="space-y-2 text-xs leading-relaxed">
+              {draft.body
+                .split(/\n{2,}/)
+                .filter(Boolean)
+                .map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="lg:col-span-4 space-y-4">
+          <Card className="p-4 space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Page Settings
+            </h3>
+
+            <div className="flex items-center justify-between pt-1">
+              <Label className="text-xs">Publish Status</Label>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={draft.published ?? true}
+                  onCheckedChange={(published) => setDraft({ ...draft, published })}
+                />
+                <span className="text-xs">{(draft.published ?? true) ? "Live" : "Draft"}</span>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs">Menu Navigation Label</Label>
+              <Input
+                placeholder="Leave blank to hide from menu"
+                value={draft.nav_label || ""}
+                onChange={(e) => setDraft({ ...draft, nav_label: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs">Menu Sort Order</Label>
+              <Input
+                type="number"
+                value={draft.sort_order ?? 0}
+                onChange={(e) => setDraft({ ...draft, sort_order: Number(e.target.value) })}
+                className="h-8 text-xs"
+              />
+            </div>
+          </Card>
+
+          {/* Featured Media */}
+          <Card className="p-4 space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Hero Banner Media
+            </h3>
+            <MediaImagePicker
+              value={draft.featured_image || ""}
+              onChange={(url) => setDraft({ ...draft, featured_image: url })}
+              label="Page Hero Image / Video"
+            />
+          </Card>
+
+          {/* SEO */}
+          <Card className="p-4 space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              SEO Meta Description
+            </h3>
+            <Textarea
+              rows={3}
+              value={draft.meta_description || ""}
+              onChange={(e) => setDraft({ ...draft, meta_description: e.target.value })}
+              placeholder="Search engine snippet…"
+              className="text-xs"
+            />
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   3. SITE CUSTOMIZER & GLOBAL SECTIONS (WordPress Customizer)
+   ========================================================================= */
+
+function SiteSectionsManager({ onSaved }: { onSaved: () => void }) {
+  const queryClient = useQueryClient();
+  const { data: sections, isLoading } = useQuery({
+    queryKey: ["site-sections"],
+    queryFn: () => getSiteSections(),
+  });
+
+  const [heroDraft, setHeroDraft] = useState<Record<string, unknown>>({});
+  const [tickerDraft, setTickerDraft] = useState<string[]>([]);
+  const [storyDraft, setStoryDraft] = useState<Record<string, unknown>>({});
+  const [initialized, setInitialized] = useState(false);
+
+  if (sections && !initialized) {
+    setHeroDraft((sections["hero"] as Record<string, unknown>) || {});
+    setTickerDraft(
+      ((sections["ticker"] as Record<string, unknown>)?.["messages"] as string[]) || [],
+    );
+    setStoryDraft((sections["about_story"] as Record<string, unknown>) || {});
+    setInitialized(true);
+  }
+
+  const saveHeroMut = useMutation({
+    mutationFn: () => saveSiteSection({ data: { section_id: "hero", data: heroDraft } }),
+    onSuccess: () => {
+      toast.success("Homepage Hero updated!");
+      queryClient.invalidateQueries({ queryKey: ["site-sections"] });
+      onSaved();
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const saveTickerMut = useMutation({
+    mutationFn: () =>
+      saveSiteSection({ data: { section_id: "ticker", data: { messages: tickerDraft } } }),
+    onSuccess: () => {
+      toast.success("Header announcement ticker saved!");
+      queryClient.invalidateQueries({ queryKey: ["site-sections"] });
+      onSaved();
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  const saveStoryMut = useMutation({
+    mutationFn: () => saveSiteSection({ data: { section_id: "about_story", data: storyDraft } }),
+    onSuccess: () => {
+      toast.success("About story & hotel highlights saved!");
+      queryClient.invalidateQueries({ queryKey: ["site-sections"] });
+      onSaved();
+    },
+    onError: (err) => toast.error((err as Error).message),
+  });
+
+  if (isLoading || !sections) {
+    return <p className="text-xs text-muted-foreground">Loading site customizer…</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Hero Section Customizer */}
+      <Card className="p-5 space-y-4">
+        <div className="flex items-center justify-between border-b pb-3">
+          <div>
+            <h3 className="font-serif text-base font-semibold flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Homepage Hero &amp; Banner
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Customize the prominent top headline, background video/photography, and primary
+              reserve buttons.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => saveHeroMut.mutate()}
+            disabled={saveHeroMut.isPending}
+            className="text-xs"
+          >
+            {saveHeroMut.isPending ? "Saving…" : "Save Hero"}
+          </Button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label className="text-xs">Hero Eyebrow</Label>
+            <Input
+              value={(heroDraft["eyebrow"] as string) || ""}
+              onChange={(e) => setHeroDraft({ ...heroDraft, eyebrow: e.target.value })}
+              className="text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Main Headline</Label>
+            <Input
+              value={(heroDraft["headline"] as string) || ""}
+              onChange={(e) => setHeroDraft({ ...heroDraft, headline: e.target.value })}
+              className="text-xs font-serif"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label className="text-xs">Hero Subtitle / Tagline</Label>
+          <Textarea
+            rows={2}
+            value={(heroDraft["tagline"] as string) || ""}
+            onChange={(e) => setHeroDraft({ ...heroDraft, tagline: e.target.value })}
+            className="text-xs"
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label className="text-xs">Primary CTA Button Label &amp; Link</Label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <Input
+                placeholder="Button text"
+                value={(heroDraft["primary_cta_label"] as string) || ""}
+                onChange={(e) => setHeroDraft({ ...heroDraft, primary_cta_label: e.target.value })}
+                className="text-xs"
+              />
+              <Input
+                placeholder="/reserve"
+                value={(heroDraft["primary_cta_link"] as string) || ""}
+                onChange={(e) => setHeroDraft({ ...heroDraft, primary_cta_link: e.target.value })}
+                className="text-xs font-mono"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Secondary Button Label &amp; Link</Label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <Input
+                placeholder="Button text"
+                value={(heroDraft["secondary_cta_label"] as string) || ""}
+                onChange={(e) =>
+                  setHeroDraft({ ...heroDraft, secondary_cta_label: e.target.value })
+                }
+                className="text-xs"
+              />
+              <Input
+                placeholder="/rooms"
+                value={(heroDraft["secondary_cta_link"] as string) || ""}
+                onChange={(e) => setHeroDraft({ ...heroDraft, secondary_cta_link: e.target.value })}
+                className="text-xs font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        <MediaImagePicker
+          value={(heroDraft["background_image"] as string) || ""}
+          onChange={(url) => setHeroDraft({ ...heroDraft, background_image: url })}
+          label="Hero Background Media (High-Res Image or Video)"
+        />
+      </Card>
+
+      {/* Announcement Ticker Customizer */}
+      <Card className="p-5 space-y-4">
+        <div className="flex items-center justify-between border-b pb-3">
+          <div>
+            <h3 className="font-serif text-base font-semibold">Header Announcement Ticker</h3>
+            <p className="text-xs text-muted-foreground">
+              These announcement messages scroll smoothly in the top banner bar across all guest
+              pages.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => saveTickerMut.mutate()}
+            disabled={saveTickerMut.isPending}
+            className="text-xs"
+          >
+            {saveTickerMut.isPending ? "Saving…" : "Save Announcements"}
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {tickerDraft.map((msg, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <Input
+                value={msg}
+                onChange={(e) => {
+                  const updated = [...tickerDraft];
+                  updated[idx] = e.target.value;
+                  setTickerDraft(updated);
+                }}
+                className="text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => setTickerDraft(tickerDraft.filter((_, i) => i !== idx))}
+                className="text-muted-foreground hover:text-destructive p-1"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setTickerDraft([...tickerDraft, "New seasonal promotion message…"])}
+            className="text-xs gap-1"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Announcement Line
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* =========================================================================
+   4. GALLERY MANAGER
+   ========================================================================= */
+
+function GalleryManager({ gallery, onSaved }: { gallery: Image[]; onSaved: () => void }) {
+  const [isAdding, setIsAdding] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Button onClick={() => setIsAdding(true)} className="gap-1.5 text-xs shadow">
+          <Plus className="h-4 w-4" />
+          Add Gallery Photo
+        </Button>
+        <span className="text-xs text-muted-foreground">{gallery.length} photos in gallery</span>
+      </div>
+
+      {isAdding && (
         <ImageEditor
           image={{
             id: "",
@@ -123,254 +1696,21 @@ function CmsPage() {
             sort_order: 99,
             published: true,
           }}
-          onSaved={refresh}
+          onSaved={() => {
+            setIsAdding(false);
+            onSaved();
+          }}
           isNew
+          onCancel={() => setIsAdding(false)}
         />
-        <div className="grid gap-4 md:grid-cols-2">
-          {(data.gallery as Image[]).map((image) => (
-            <ImageEditor key={image.id} image={image} onSaved={refresh} />
-          ))}
-        </div>
-      </TabsContent>
-
-      <TabsContent value="media" className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-lg font-serif font-semibold">Website Media & Asset Folders</h2>
-          <p className="text-xs text-muted-foreground">
-            Browse all high-resolution photography stored in the project's code and public folders.
-            Click any image to preview, copy its public web path, or copy its direct asset URL for
-            pages, rooms, or marketing.
-          </p>
-        </div>
-        <MediaLibraryBrowser />
-      </TabsContent>
-
-      <TabsContent value="faqs" className="space-y-4">
-        <FaqEditor
-          faq={{ id: "", question: "", answer: "", sort_order: 99, published: true }}
-          onSaved={refresh}
-          isNew
-        />
-        {(data.faqs as Faq[]).map((faq) => (
-          <FaqEditor key={faq.id} faq={faq} onSaved={refresh} />
-        ))}
-      </TabsContent>
-
-      <TabsContent value="menu" className="space-y-4">
-        <MenuManager />
-      </TabsContent>
-
-      <TabsContent value="coupons" className="space-y-4">
-        <CouponManager />
-      </TabsContent>
-
-      <TabsContent value="reviews" className="space-y-4">
-        <ReviewsModerator />
-      </TabsContent>
-
-      <TabsContent value="inquiries" className="space-y-4">
-        <ContactInquiriesModerator />
-      </TabsContent>
-    </Tabs>
-  );
-}
-
-function PageEditor({ page, onSaved }: { page: Page; onSaved: () => void }) {
-  const [draft, setDraft] = useState(page);
-  const save = useMutation({
-    mutationFn: () =>
-      savePage({
-        data: {
-          id: draft.id,
-          title: draft.title,
-          subtitle: draft.subtitle,
-          body: draft.body,
-          meta_description: draft.meta_description,
-          nav_label: draft.nav_label ?? "",
-          sort_order: Number(draft.sort_order ?? 0),
-          published: draft.published ?? true,
-        } as never,
-      }),
-    onSuccess: () => {
-      toast.success(`/${draft.slug} published.`);
-      onSaved();
-    },
-    onError: (error) => toast.error((error as Error).message),
-  });
-
-  return (
-    <Card className="grid gap-4 p-5 lg:grid-cols-2">
-      <div className="space-y-3">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">/{draft.slug}</p>
-        <div>
-          <Label>Title</Label>
-          <Input
-            value={draft.title}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label>Subtitle</Label>
-          <Input
-            value={draft.subtitle}
-            onChange={(e) => setDraft({ ...draft, subtitle: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label>Body</Label>
-          <Textarea
-            rows={8}
-            value={draft.body}
-            onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label>Meta description (SEO)</Label>
-          <Textarea
-            rows={2}
-            value={draft.meta_description}
-            onChange={(e) => setDraft({ ...draft, meta_description: e.target.value })}
-          />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <Label>Menu label (blank = hidden)</Label>
-            <Input
-              value={draft.nav_label ?? ""}
-              onChange={(e) => setDraft({ ...draft, nav_label: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>Order</Label>
-            <Input
-              type="number"
-              value={draft.sort_order ?? 0}
-              onChange={(e) => setDraft({ ...draft, sort_order: Number(e.target.value) })}
-            />
-          </div>
-          <div className="flex items-center gap-2 pt-6">
-            <Switch
-              checked={draft.published ?? true}
-              onCheckedChange={(published) => setDraft({ ...draft, published })}
-            />
-            <span className="text-xs">{(draft.published ?? true) ? "Published" : "Hidden"}</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>
-            {save.isPending ? "Publishing…" : "Publish"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={async () => {
-              if (!confirm(`Delete the page /${draft.slug}? This cannot be undone.`)) return;
-              await deletePage({ data: { id: draft.id } });
-              toast.success("Page deleted.");
-              onSaved();
-            }}
-          >
-            Delete page
-          </Button>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-border/60 bg-background p-6">
-        <p className="mb-3 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-          Live preview
-        </p>
-        <h2 className="font-serif text-3xl">{draft.title || "Untitled page"}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">{draft.subtitle}</p>
-        <div className="mt-4 space-y-3 text-sm leading-relaxed">
-          {draft.body
-            .split(/\n{2,}/)
-            .filter(Boolean)
-            .map((para, i) => (
-              <p key={i}>{para}</p>
-            ))}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function FaqEditor({ faq, onSaved, isNew }: { faq: Faq; onSaved: () => void; isNew?: boolean }) {
-  const [draft, setDraft] = useState(faq);
-  const save = useMutation({
-    mutationFn: () =>
-      saveFaq({
-        data: {
-          ...(draft.id ? { id: draft.id } : {}),
-          question: draft.question,
-          answer: draft.answer,
-          sort_order: Number(draft.sort_order),
-          published: draft.published,
-        } as never,
-      }),
-    onSuccess: () => {
-      toast.success("FAQ published.");
-      if (isNew) setDraft(faq);
-      onSaved();
-    },
-    onError: (error) => toast.error((error as Error).message),
-  });
-
-  return (
-    <Card className="space-y-3 p-5">
-      {isNew && (
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Add a new FAQ</p>
       )}
-      <div>
-        <Label>Question</Label>
-        <Input
-          value={draft.question}
-          onChange={(e) => setDraft({ ...draft, question: e.target.value })}
-        />
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {gallery.map((image) => (
+          <ImageEditor key={image.id} image={image} onSaved={onSaved} />
+        ))}
       </div>
-      <div>
-        <Label>Answer</Label>
-        <Textarea
-          rows={3}
-          value={draft.answer}
-          onChange={(e) => setDraft({ ...draft, answer: e.target.value })}
-        />
-      </div>
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="w-28">
-          <Label>Order</Label>
-          <Input
-            type="number"
-            value={draft.sort_order}
-            onChange={(e) => setDraft({ ...draft, sort_order: Number(e.target.value) })}
-          />
-        </div>
-        <div className="flex items-center gap-2 pt-5">
-          <Switch
-            checked={draft.published}
-            onCheckedChange={(published) => setDraft({ ...draft, published })}
-          />
-          <span className="text-xs">{draft.published ? "Published" : "Hidden"}</span>
-        </div>
-        <div className="ml-auto flex gap-2 pt-5">
-          {!isNew && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={async () => {
-                await deleteFaq({ data: { id: draft.id } });
-                toast.success("FAQ removed.");
-                onSaved();
-              }}
-            >
-              Delete
-            </Button>
-          )}
-          <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>
-            {isNew ? "Add FAQ" : "Publish"}
-          </Button>
-        </div>
-      </div>
-    </Card>
+    </div>
   );
 }
 
@@ -378,10 +1718,12 @@ function ImageEditor({
   image,
   onSaved,
   isNew,
+  onCancel,
 }: {
   image: Image;
   onSaved: () => void;
   isNew?: boolean;
+  onCancel?: () => void;
 }) {
   const [draft, setDraft] = useState(image);
   const save = useMutation({
@@ -398,75 +1740,75 @@ function ImageEditor({
       }),
     onSuccess: () => {
       toast.success("Gallery updated.");
-      if (isNew) setDraft(image);
       onSaved();
     },
     onError: (error) => toast.error((error as Error).message),
   });
 
   return (
-    <Card className="space-y-4 p-5">
-      {isNew && (
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Add a new gallery item
-        </p>
-      )}
-
+    <Card className="space-y-3 p-4">
       <MediaImagePicker
         value={draft.url}
         onChange={(url) => setDraft({ ...draft, url })}
-        label="Select Image (Project Folders, Upload from Computer, or YouTube Video Cover)"
-        placeholder="/images/... or https://..."
+        label="Photo Asset"
+        compact
       />
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         <div>
-          <Label>Caption</Label>
+          <Label className="text-xs">Caption</Label>
           <Input
             value={draft.caption}
             onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
+            className="h-8 text-xs"
           />
         </div>
         <div>
-          <Label>Category</Label>
+          <Label className="text-xs">Category</Label>
           <Input
             value={draft.category}
             onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+            className="h-8 text-xs"
           />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="w-24">
-          <Label>Order</Label>
-          <Input
-            type="number"
-            value={draft.sort_order}
-            onChange={(e) => setDraft({ ...draft, sort_order: Number(e.target.value) })}
-          />
-        </div>
-        <div className="flex items-center gap-2 pt-5">
+
+      <div className="flex items-center justify-between pt-2 border-t">
+        <div className="flex items-center gap-2">
           <Switch
             checked={draft.published}
             onCheckedChange={(published) => setDraft({ ...draft, published })}
           />
-          <span className="text-xs">{draft.published ? "Published" : "Hidden"}</span>
+          <span className="text-xs">{draft.published ? "Visible" : "Hidden"}</span>
         </div>
-        <div className="ml-auto flex gap-2 pt-5">
+
+        <div className="flex gap-2">
           {!isNew && (
             <Button
               size="sm"
               variant="outline"
+              className="h-7 text-xs"
               onClick={async () => {
                 await deleteGalleryImage({ data: { id: draft.id } });
-                toast.success("Image removed.");
+                toast.success("Photo removed.");
                 onSaved();
               }}
             >
-              Delete
+              <Trash2 className="h-3 w-3" />
             </Button>
           )}
-          <Button size="sm" disabled={save.isPending || !draft.url} onClick={() => save.mutate()}>
-            {isNew ? "Add image" : "Publish"}
+          {onCancel && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button
+            size="sm"
+            disabled={save.isPending || !draft.url}
+            onClick={() => save.mutate()}
+            className="h-7 text-xs"
+          >
+            {isNew ? "Add" : "Save"}
           </Button>
         </div>
       </div>
@@ -474,124 +1816,137 @@ function ImageEditor({
   );
 }
 
-function NewPage({ onSaved }: { onSaved: () => void }) {
-  const [draft, setDraft] = useState({
-    slug: "",
-    title: "",
-    subtitle: "",
-    body: "",
-    meta_description: "",
-    nav_label: "",
-    sort_order: 10,
-    published: true,
-  });
+/* =========================================================================
+   5. FAQS MANAGER
+   ========================================================================= */
+
+function FaqsManager({ faqs, onSaved }: { faqs: Faq[]; onSaved: () => void }) {
+  const [isAdding, setIsAdding] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Button onClick={() => setIsAdding(true)} className="gap-1.5 text-xs shadow">
+          <Plus className="h-4 w-4" />
+          Add FAQ
+        </Button>
+        <span className="text-xs text-muted-foreground">{faqs.length} FAQ item(s)</span>
+      </div>
+
+      {isAdding && (
+        <FaqEditor
+          faq={{ id: "", question: "", answer: "", sort_order: 99, published: true }}
+          onSaved={() => {
+            setIsAdding(false);
+            onSaved();
+          }}
+          isNew
+          onCancel={() => setIsAdding(false)}
+        />
+      )}
+
+      <div className="space-y-3">
+        {faqs.map((faq) => (
+          <FaqEditor key={faq.id} faq={faq} onSaved={onSaved} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FaqEditor({
+  faq,
+  onSaved,
+  isNew,
+  onCancel,
+}: {
+  faq: Faq;
+  onSaved: () => void;
+  isNew?: boolean;
+  onCancel?: () => void;
+}) {
+  const [draft, setDraft] = useState(faq);
   const save = useMutation({
     mutationFn: () =>
-      createPage({ data: { ...draft, sort_order: Number(draft.sort_order) } as never }),
+      saveFaq({
+        data: {
+          ...(draft.id ? { id: draft.id } : {}),
+          question: draft.question,
+          answer: draft.answer,
+          sort_order: Number(draft.sort_order),
+          published: draft.published,
+        } as never,
+      }),
     onSuccess: () => {
-      toast.success(`Page created — it is live at /p/${draft.slug}`);
-      setDraft({
-        slug: "",
-        title: "",
-        subtitle: "",
-        body: "",
-        meta_description: "",
-        nav_label: "",
-        sort_order: 10,
-        published: true,
-      });
+      toast.success("FAQ saved.");
       onSaved();
     },
     onError: (error) => toast.error((error as Error).message),
   });
 
   return (
-    <Card className="space-y-3 p-5">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Add a new page</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label>Page title</Label>
-          <Input
-            value={draft.title}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                title: e.target.value,
-                slug:
-                  draft.slug ||
-                  e.target.value
-                    .toLowerCase()
-                    .trim()
-                    .replace(/[^a-z0-9]+/g, "-")
-                    .replace(/^-|-$/g, ""),
-              })
-            }
-          />
-        </div>
-        <div>
-          <Label>Web address</Label>
-          <Input
-            value={draft.slug}
-            onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
-            placeholder="spa-and-wellness"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Will be live at /p/{draft.slug || "your-page"}
-          </p>
-        </div>
-      </div>
+    <Card className="space-y-3 p-4">
       <div>
-        <Label>Subtitle</Label>
+        <Label className="text-xs font-semibold">Question</Label>
         <Input
-          value={draft.subtitle}
-          onChange={(e) => setDraft({ ...draft, subtitle: e.target.value })}
+          value={draft.question}
+          onChange={(e) => setDraft({ ...draft, question: e.target.value })}
+          className="text-xs"
         />
       </div>
       <div>
-        <Label>Body</Label>
+        <Label className="text-xs font-semibold">Answer</Label>
         <Textarea
-          rows={5}
-          value={draft.body}
-          onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+          rows={3}
+          value={draft.answer}
+          onChange={(e) => setDraft({ ...draft, answer: e.target.value })}
+          className="text-xs"
         />
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div>
-          <Label>Menu label (optional)</Label>
-          <Input
-            value={draft.nav_label}
-            onChange={(e) => setDraft({ ...draft, nav_label: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label>Order</Label>
-          <Input
-            type="number"
-            value={draft.sort_order}
-            onChange={(e) => setDraft({ ...draft, sort_order: Number(e.target.value) })}
-          />
-        </div>
-        <div className="flex items-center gap-2 pt-6">
+      <div className="flex items-center justify-between pt-2 border-t">
+        <div className="flex items-center gap-2">
           <Switch
             checked={draft.published}
             onCheckedChange={(published) => setDraft({ ...draft, published })}
           />
           <span className="text-xs">{draft.published ? "Published" : "Hidden"}</span>
         </div>
+        <div className="flex gap-2">
+          {!isNew && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={async () => {
+                await deleteFaq({ data: { id: draft.id } });
+                toast.success("FAQ removed.");
+                onSaved();
+              }}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+          {onCancel && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button
+            size="sm"
+            disabled={save.isPending}
+            onClick={() => save.mutate()}
+            className="h-7 text-xs"
+          >
+            {isNew ? "Add FAQ" : "Save"}
+          </Button>
+        </div>
       </div>
-      <Button
-        size="sm"
-        disabled={save.isPending || !draft.title || !draft.slug}
-        onClick={() => save.mutate()}
-      >
-        {save.isPending ? "Creating…" : "Create page"}
-      </Button>
     </Card>
   );
 }
 
 /* =========================================================================
-   F&B MENU MANAGER
+   6. F&B MENU MANAGER
    ========================================================================= */
 
 type MenuItemRecord = {
@@ -606,211 +1961,278 @@ type MenuItemRecord = {
 };
 
 const MENU_CATEGORIES = [
-  "Soups & Swallows",
-  "Rice Specialties",
-  "Grills & Asun",
-  "Starters & Bites",
-  "Peppersoup Corner",
-  "Quick Meals",
-  "Desserts & Pastries",
-  "Bar & Signature Cocktails",
+  "Breakfast Specials",
+  "Native & African Soups",
+  "Chef Grills & Asun",
+  "Continental Dishes",
+  "Desserts & Small Chops",
+  "Signature Cocktails & Spirits",
+  "Wines & Champagnes",
+  "Non-Alcoholic & Juices",
 ];
 
 function MenuManager() {
   const queryClient = useQueryClient();
-  const { data: items = [], isLoading } = useQuery({
-    queryKey: ["cms-menu"],
-    queryFn: () => listMenuItems() as Promise<MenuItemRecord[]>,
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [editingItem, setEditingItem] = useState<MenuItemRecord | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: menuItems = [], isLoading } = useQuery({
+    queryKey: ["cms-menu-items"],
+    queryFn: () => listMenuItems(),
   });
 
-  const [editingItem, setEditingItem] = useState<MenuItemRecord>({
-    name: "",
-    category: "Soups & Swallows",
-    description: "",
-    price: 3500,
-    in_stock: true,
-    tags: ["Chef's Special"],
-    sort_order: 1,
-  });
-
-  const save = useMutation({
-    mutationFn: () => saveMenuItem({ data: editingItem }),
+  const saveMutation = useMutation({
+    mutationFn: (data: MenuItemRecord) =>
+      saveMenuItem({
+        data: {
+          ...(data.id ? { id: data.id } : {}),
+          name: data.name,
+          category: data.category,
+          description: data.description || "",
+          price: Number(data.price),
+          in_stock: Boolean(data.in_stock),
+          tags: data.tags || [],
+          sort_order: Number(data.sort_order || 0),
+        },
+      }),
     onSuccess: () => {
-      toast.success("Menu item saved successfully.");
-      queryClient.invalidateQueries({ queryKey: ["cms-menu"] });
-      setEditingItem({
-        name: "",
-        category: "Soups & Swallows",
-        description: "",
-        price: 3500,
-        in_stock: true,
-        tags: [],
-        sort_order: (items.length || 0) + 1,
-      });
+      toast.success("Menu item saved.");
+      setEditingItem(null);
+      setIsCreating(false);
+      queryClient.invalidateQueries({ queryKey: ["cms-menu-items"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (err) => toast.error((err as Error).message),
   });
 
-  const remove = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteMenuItem({ data: { id } }),
     onSuccess: () => {
       toast.success("Menu item deleted.");
-      queryClient.invalidateQueries({ queryKey: ["cms-menu"] });
+      queryClient.invalidateQueries({ queryKey: ["cms-menu-items"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (err) => toast.error((err as Error).message),
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading menu items…</p>;
+  const filtered = (menuItems as MenuItemRecord[]).filter((item) => {
+    const matchesCat = activeCategory === "all" || item.category === activeCategory;
+    const matchesSearch =
+      !searchQuery ||
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Create / Edit Form */}
-      <Card className="p-5 border-primary/20 bg-card space-y-4">
-        <div className="flex items-center gap-2">
-          <Utensils className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold text-base">
-            {editingItem.id ? "Edit Menu Item" : "Add New Dish / Beverage"}
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button onClick={() => setIsCreating(true)} className="gap-1.5 text-xs shadow">
+          <Plus className="h-4 w-4" />
+          Add Dish / Beverage
+        </Button>
+        <Input
+          placeholder="Search dishes or cocktails…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="h-8 w-60 text-xs"
+        />
+      </div>
+
+      {(isCreating || editingItem) && (
+        <Card className="p-5 border-primary/40 bg-primary/5 space-y-4">
+          <h3 className="font-serif text-base font-semibold">
+            {isCreating ? "Add New Menu Item" : `Editing: ${editingItem?.name}`}
           </h3>
-        </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label className="text-xs">Item Name</Label>
+              <Input
+                value={editingItem?.name || ""}
+                onChange={(e) =>
+                  setEditingItem((prev) => ({
+                    ...(prev || {
+                      name: "",
+                      category: "Breakfast Specials",
+                      description: "",
+                      price: 0,
+                      in_stock: true,
+                      tags: [],
+                      sort_order: 0,
+                    }),
+                    name: e.target.value,
+                  }))
+                }
+                className="text-xs"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Category</Label>
+              <select
+                value={editingItem?.category || MENU_CATEGORIES[0]}
+                onChange={(e) =>
+                  setEditingItem((prev) => ({
+                    ...(prev || {
+                      name: "",
+                      category: e.target.value,
+                      description: "",
+                      price: 0,
+                      in_stock: true,
+                      tags: [],
+                      sort_order: 0,
+                    }),
+                    category: e.target.value,
+                  }))
+                }
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+              >
+                {MENU_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="sm:col-span-2">
-            <Label>Dish / Item Name</Label>
-            <Input
-              value={editingItem.name}
-              onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-              placeholder="e.g. Ekiti Pounded Yam & Goat Meat Egusi"
-            />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label className="text-xs">Price (₦ Naira)</Label>
+              <Input
+                type="number"
+                value={editingItem?.price || 0}
+                onChange={(e) =>
+                  setEditingItem((prev) => ({
+                    ...(prev || {
+                      name: "",
+                      category: "Breakfast Specials",
+                      description: "",
+                      price: 0,
+                      in_stock: true,
+                      tags: [],
+                      sort_order: 0,
+                    }),
+                    price: Number(e.target.value),
+                  }))
+                }
+                className="text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-2 pt-6">
+              <Switch
+                checked={editingItem?.in_stock ?? true}
+                onCheckedChange={(checked) =>
+                  setEditingItem((prev) => ({
+                    ...(prev || {
+                      name: "",
+                      category: "Breakfast Specials",
+                      description: "",
+                      price: 0,
+                      in_stock: true,
+                      tags: [],
+                      sort_order: 0,
+                    }),
+                    in_stock: checked,
+                  }))
+                }
+              />
+              <span className="text-xs font-medium">
+                {(editingItem?.in_stock ?? true) ? "In Stock (Available)" : "Sold Out"}
+              </span>
+            </div>
           </div>
-          <div>
-            <Label>Category</Label>
-            <select
-              value={editingItem.category}
-              onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            >
-              {MENU_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
           <div>
-            <Label>Price (₦ NGN)</Label>
-            <Input
-              type="number"
-              value={editingItem.price}
-              onChange={(e) => setEditingItem({ ...editingItem, price: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <Label>Display Order</Label>
-            <Input
-              type="number"
-              value={editingItem.sort_order}
+            <Label className="text-xs">Description &amp; Ingredients</Label>
+            <Textarea
+              rows={2}
+              value={editingItem?.description || ""}
               onChange={(e) =>
-                setEditingItem({ ...editingItem, sort_order: Number(e.target.value) })
+                setEditingItem((prev) => ({
+                  ...(prev || {
+                    name: "",
+                    category: "Breakfast Specials",
+                    description: "",
+                    price: 0,
+                    in_stock: true,
+                    tags: [],
+                    sort_order: 0,
+                  }),
+                  description: e.target.value,
+                }))
               }
+              className="text-xs"
             />
           </div>
-          <div className="flex items-center gap-2 pt-6">
-            <Switch
-              checked={editingItem.in_stock}
-              onCheckedChange={(in_stock) => setEditingItem({ ...editingItem, in_stock })}
-            />
-            <span className="text-xs">
-              {editingItem.in_stock ? "In Stock (Available)" : "Sold Out"}
-            </span>
-          </div>
-        </div>
 
-        <div>
-          <Label>Culinary Description & Ingredients</Label>
-          <Textarea
-            rows={2}
-            value={editingItem.description}
-            onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-            placeholder="Freshly pounded Ekiti yam served with slow-cooked goat meat, rich melon seed stew..."
-          />
-        </div>
-
-        <div className="flex items-center justify-between border-t border-border pt-3">
-          {editingItem.id && (
+          <div className="flex justify-end gap-2">
             <Button
-              variant="outline"
               size="sm"
-              onClick={() =>
-                setEditingItem({
-                  name: "",
-                  category: "Soups & Swallows",
-                  description: "",
-                  price: 3500,
-                  in_stock: true,
-                  tags: [],
-                  sort_order: 1,
-                })
-              }
+              variant="outline"
+              onClick={() => {
+                setIsCreating(false);
+                setEditingItem(null);
+              }}
+              className="text-xs"
             >
-              Cancel Edit
+              Cancel
             </Button>
-          )}
-          <Button
-            size="sm"
-            disabled={save.isPending || !editingItem.name.trim()}
-            onClick={() => save.mutate()}
-          >
-            {save.isPending
-              ? "Saving…"
-              : editingItem.id
-                ? "Update Menu Item"
-                : "Add to Restaurant Menu"}
-          </Button>
-        </div>
-      </Card>
+            <Button
+              size="sm"
+              disabled={!editingItem?.name || saveMutation.isPending}
+              onClick={() => editingItem && saveMutation.mutate(editingItem)}
+              className="text-xs"
+            >
+              {saveMutation.isPending ? "Saving…" : "Save Item"}
+            </Button>
+          </div>
+        </Card>
+      )}
 
-      {/* Menu Catalog Table */}
-      <div className="grid gap-3 md:grid-cols-2">
-        {items.map((item) => (
-          <Card key={item.id} className="p-4 flex flex-col justify-between space-y-3">
+      {/* List */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {filtered.map((item) => (
+          <Card key={item.id || item.name} className="p-4 space-y-2 flex flex-col justify-between">
             <div>
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <Badge variant="outline" className="text-[10px]">
-                    {item.category}
-                  </Badge>
-                  <h4 className="font-semibold text-base mt-1">{item.name}</h4>
-                </div>
-                <span className="font-mono font-bold text-primary text-sm">
+                <h4 className="font-serif text-sm font-semibold">{item.name}</h4>
+                <span className="font-mono text-xs font-semibold text-primary">
                   {naira(item.price)}
                 </span>
               </div>
-              {item.description && (
-                <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">
-                  {item.description}
-                </p>
-              )}
+              <Badge variant="outline" className="text-[10px] my-1">
+                {item.category}
+              </Badge>
+              <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
             </div>
 
-            <div className="flex items-center justify-between border-t border-border/60 pt-2.5 text-xs">
-              <Badge variant={item.in_stock ? "default" : "secondary"} className="text-[10px]">
-                {item.in_stock ? "In Stock" : "Sold Out"}
-              </Badge>
-              <div className="flex items-center gap-1.5">
-                <Button size="sm" variant="ghost" onClick={() => setEditingItem(item)}>
+            <div className="flex items-center justify-between pt-2 border-t text-xs">
+              <span
+                className={`text-[10px] font-medium ${
+                  item.in_stock ? "text-emerald-600" : "text-destructive"
+                }`}
+              >
+                {item.in_stock ? "Available" : "Sold out"}
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-[11px]"
+                  onClick={() => setEditingItem(item)}
+                >
                   Edit
                 </Button>
                 {item.id && (
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-destructive hover:bg-destructive/10"
-                    onClick={() => remove.mutate(item.id!)}
+                    className="h-6 text-[11px] text-destructive"
+                    onClick={() => {
+                      if (confirm(`Delete "${item.name}"?`)) deleteMutation.mutate(item.id!);
+                    }}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
                   </Button>
                 )}
               </div>
@@ -823,7 +2245,7 @@ function MenuManager() {
 }
 
 /* =========================================================================
-   PROMOTIONAL COUPONS & VOUCHERS MANAGER
+   7. COUPONS & PROMO VOUCHERS MANAGER
    ========================================================================= */
 
 type CouponRecord = {
@@ -840,172 +2262,190 @@ type CouponRecord = {
 
 function CouponManager() {
   const queryClient = useQueryClient();
-  const { data: coupons = [], isLoading } = useQuery({
+  const [editingCoupon, setEditingCoupon] = useState<CouponRecord | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  const { data: coupons = [] } = useQuery({
     queryKey: ["cms-coupons"],
-    queryFn: () => listCoupons() as Promise<CouponRecord[]>,
+    queryFn: () => listCoupons(),
   });
 
-  const [draft, setDraft] = useState<CouponRecord>({
-    code: "BANKYGOLD15",
-    discount_type: "percentage",
-    discount_value: 15,
-    min_spend: 50000,
-    max_uses: 100,
-    uses_count: 0,
-    valid_until: "2026-12-31",
-    active: true,
-  });
-
-  const save = useMutation({
-    mutationFn: () => saveCoupon({ data: draft }),
+  const saveMutation = useMutation({
+    mutationFn: (data: CouponRecord) =>
+      saveCoupon({
+        data: {
+          ...(data.id ? { id: data.id } : {}),
+          code: data.code,
+          discount_type: data.discount_type,
+          discount_value: Number(data.discount_value),
+          min_spend: Number(data.min_spend || 0),
+          max_uses: Number(data.max_uses || 100),
+          uses_count: Number(data.uses_count || 0),
+          valid_until: data.valid_until || "",
+          active: Boolean(data.active),
+        },
+      }),
     onSuccess: () => {
-      toast.success("Discount coupon code registered.");
+      toast.success("Coupon saved.");
+      setEditingCoupon(null);
+      setIsCreating(false);
       queryClient.invalidateQueries({ queryKey: ["cms-coupons"] });
-      setDraft({
-        code: "",
-        discount_type: "percentage",
-        discount_value: 10,
-        min_spend: 30000,
-        max_uses: 50,
-        uses_count: 0,
-        valid_until: "2026-12-31",
-        active: true,
-      });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (err) => toast.error((err as Error).message),
   });
 
-  const remove = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCoupon({ data: { id } }),
     onSuccess: () => {
       toast.success("Coupon removed.");
       queryClient.invalidateQueries({ queryKey: ["cms-coupons"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (err) => toast.error((err as Error).message),
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading coupons…</p>;
-
   return (
-    <div className="space-y-6">
-      {/* Coupon Creator */}
-      <Card className="p-5 border-primary/20 bg-card space-y-4">
-        <div className="flex items-center gap-2">
-          <Tag className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold text-base">Generate Discount Voucher / Coupon</h3>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Button onClick={() => setIsCreating(true)} className="gap-1.5 text-xs shadow">
+          <Plus className="h-4 w-4" />
+          Create Promo Voucher
+        </Button>
+      </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <Label>Coupon Code</Label>
-            <Input
-              value={draft.code}
-              onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase() })}
-              placeholder="e.g. EKITIFEST20"
-              className="font-mono uppercase font-bold"
-            />
-          </div>
-          <div>
-            <Label>Discount Type</Label>
-            <select
-              value={draft.discount_type}
-              onChange={(e) =>
-                setDraft({ ...draft, discount_type: e.target.value as "percentage" | "fixed" })
-              }
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            >
-              <option value="percentage">Percentage Off (%)</option>
-              <option value="fixed">Fixed Amount Off (₦ NGN)</option>
-            </select>
-          </div>
-          <div>
-            <Label>Discount Value ({draft.discount_type === "percentage" ? "%" : "₦"})</Label>
-            <Input
-              type="number"
-              value={draft.discount_value}
-              onChange={(e) => setDraft({ ...draft, discount_value: Number(e.target.value) })}
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <Label>Min. Booking Spend (₦)</Label>
-            <Input
-              type="number"
-              value={draft.min_spend}
-              onChange={(e) => setDraft({ ...draft, min_spend: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <Label>Max Redemptions</Label>
-            <Input
-              type="number"
-              value={draft.max_uses}
-              onChange={(e) => setDraft({ ...draft, max_uses: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <Label>Expiration Date</Label>
-            <Input
-              type="date"
-              value={draft.valid_until}
-              onChange={(e) => setDraft({ ...draft, valid_until: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-border pt-3">
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={draft.active}
-              onCheckedChange={(active) => setDraft({ ...draft, active })}
-            />
-            <span className="text-xs">{draft.active ? "Coupon Active" : "Coupon Paused"}</span>
-          </div>
-          <Button
-            size="sm"
-            disabled={save.isPending || !draft.code.trim()}
-            onClick={() => save.mutate()}
-          >
-            {save.isPending ? "Saving…" : "Register Coupon"}
-          </Button>
-        </div>
-      </Card>
-
-      {/* Coupon List */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {coupons.map((c) => (
-          <Card key={c.id} className="p-4 flex flex-col justify-between space-y-3">
+      {(isCreating || editingCoupon) && (
+        <Card className="p-4 space-y-3 border-primary/40 bg-primary/5">
+          <h4 className="font-serif text-sm font-semibold">
+            {isCreating ? "New Voucher Code" : `Edit Voucher: ${editingCoupon?.code}`}
+          </h4>
+          <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-base tracking-wider text-primary">
-                  {c.code}
-                </span>
-                <Badge variant={c.active ? "default" : "secondary"} className="text-[10px]">
-                  {c.active ? "Active" : "Disabled"}
-                </Badge>
-              </div>
-              <div className="mt-2 text-sm font-semibold">
-                {c.discount_type === "percentage"
-                  ? `${c.discount_value}% Discount`
-                  : `${naira(c.discount_value)} Flat Discount`}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Min spend: {naira(c.min_spend)} • Max uses: {c.max_uses}
-              </p>
+              <Label className="text-xs">Coupon Code</Label>
+              <Input
+                placeholder="e.g. BANKY2026"
+                value={editingCoupon?.code || ""}
+                onChange={(e) =>
+                  setEditingCoupon((prev) => ({
+                    ...(prev || {
+                      code: "",
+                      discount_type: "percentage",
+                      discount_value: 10,
+                      min_spend: 0,
+                      max_uses: 50,
+                      uses_count: 0,
+                      valid_until: "",
+                      active: true,
+                    }),
+                    code: e.target.value.toUpperCase(),
+                  }))
+                }
+                className="text-xs font-mono font-bold"
+              />
             </div>
+            <div>
+              <Label className="text-xs">Discount Type</Label>
+              <select
+                value={editingCoupon?.discount_type || "percentage"}
+                onChange={(e) =>
+                  setEditingCoupon((prev) => ({
+                    ...(prev || {
+                      code: "",
+                      discount_type: "percentage",
+                      discount_value: 10,
+                      min_spend: 0,
+                      max_uses: 50,
+                      uses_count: 0,
+                      valid_until: "",
+                      active: true,
+                    }),
+                    discount_type: e.target.value as "percentage" | "fixed",
+                  }))
+                }
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+              >
+                <option value="percentage">Percentage (%) Off</option>
+                <option value="fixed">Fixed Amount (₦) Off</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">Discount Amount</Label>
+              <Input
+                type="number"
+                value={editingCoupon?.discount_value || 0}
+                onChange={(e) =>
+                  setEditingCoupon((prev) => ({
+                    ...(prev || {
+                      code: "",
+                      discount_type: "percentage",
+                      discount_value: 10,
+                      min_spend: 0,
+                      max_uses: 50,
+                      uses_count: 0,
+                      valid_until: "",
+                      active: true,
+                    }),
+                    discount_value: Number(e.target.value),
+                  }))
+                }
+                className="text-xs"
+              />
+            </div>
+          </div>
 
-            <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
-              <span>Expires: {c.valid_until || "Never"}</span>
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setIsCreating(false);
+                setEditingCoupon(null);
+              }}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!editingCoupon?.code || saveMutation.isPending}
+              onClick={() => editingCoupon && saveMutation.mutate(editingCoupon)}
+              className="text-xs"
+            >
+              Save Voucher
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+        {(coupons as CouponRecord[]).map((c) => (
+          <Card key={c.id || c.code} className="p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-sm font-bold text-primary">{c.code}</span>
+              <Badge variant={c.active ? "default" : "outline"} className="text-[10px]">
+                {c.active ? "Active" : "Disabled"}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {c.discount_type === "percentage"
+                ? `${c.discount_value}% Discount`
+                : `${naira(c.discount_value)} Flat Discount`}
+            </p>
+            <div className="flex justify-end gap-1 pt-2 border-t text-xs">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 text-[11px]"
+                onClick={() => setEditingCoupon(c)}
+              >
+                Edit
+              </Button>
               {c.id && (
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-destructive hover:bg-destructive/10"
-                  onClick={() => remove.mutate(c.id!)}
+                  className="h-6 text-[11px] text-destructive"
+                  onClick={() => deleteMutation.mutate(c.id!)}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
                 </Button>
               )}
             </div>
@@ -1017,128 +2457,69 @@ function CouponManager() {
 }
 
 /* =========================================================================
-   GUEST REVIEWS & TESTIMONIALS MODERATOR
+   8. REVIEWS MODERATOR
    ========================================================================= */
-
-type TestimonialRecord = {
-  id: string;
-  guest_name: string;
-  location: string;
-  stay_type: string;
-  rating: number;
-  content: string;
-  verified?: boolean;
-  featured?: boolean;
-  staff_response?: string;
-  created_at: string;
-};
 
 function ReviewsModerator() {
   const queryClient = useQueryClient();
-  const { data: reviews = [], isLoading } = useQuery({
+  const { data: reviews = [] } = useQuery({
     queryKey: ["cms-reviews"],
-    queryFn: () => listAdminTestimonials() as Promise<TestimonialRecord[]>,
+    queryFn: () => listAdminTestimonials(),
   });
 
-  const moderate = useMutation({
-    mutationFn: (vars: { id: string; verified?: boolean; featured?: boolean }) =>
-      moderateTestimonial({ data: vars }),
+  const moderateMut = useMutation({
+    mutationFn: (args: { id: string; verified?: boolean; featured?: boolean }) =>
+      moderateTestimonial({ data: args }),
     onSuccess: () => {
-      toast.success("Review status updated.");
+      toast.success("Review updated.");
       queryClient.invalidateQueries({ queryKey: ["cms-reviews"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (err) => toast.error((err as Error).message),
   });
 
-  const remove = useMutation({
+  const deleteMut = useMutation({
     mutationFn: (id: string) => deleteAdminTestimonial({ data: { id } }),
     onSuccess: () => {
       toast.success("Review removed.");
       queryClient.invalidateQueries({ queryKey: ["cms-reviews"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (err) => toast.error((err as Error).message),
   });
-
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading reviews…</p>;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold text-base">Guest Reviews Moderation & Verification</h3>
-        </div>
-        <Badge variant="outline" className="text-xs">
-          {reviews.length} Total Submissions
-        </Badge>
-      </div>
-
-      <div className="grid gap-3">
-        {reviews.map((r) => (
-          <Card key={r.id} className="p-4 space-y-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold text-sm">{r.guest_name}</h4>
-                  <span className="text-xs text-muted-foreground">({r.location})</span>
-                  {r.verified && (
-                    <Badge
-                      variant="outline"
-                      className="text-emerald-600 border-emerald-500/30 text-[10px]"
-                    >
-                      <CheckCircle className="h-3 w-3 mr-1" /> Verified Stay
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5">{r.stay_type}</div>
-              </div>
-
-              <div className="flex items-center gap-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`h-3.5 w-3.5 ${
-                      i < r.rating ? "fill-amber-400 text-amber-400" : "fill-muted text-muted"
-                    }`}
-                  />
+      <h3 className="font-serif text-sm font-semibold">Guest Reviews &amp; Testimonials</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {(reviews as Array<Record<string, unknown>>).map((r) => (
+          <Card key={r["id"] as string} className="p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-xs text-foreground">
+                {r["guest_name"] as string}
+              </span>
+              <div className="flex text-amber-500">
+                {Array.from({ length: Number(r["rating"] || 5) }).map((_, i) => (
+                  <Star key={i} className="h-3 w-3 fill-current" />
                 ))}
               </div>
             </div>
-
-            <p className="text-xs sm:text-sm text-foreground bg-muted/30 p-3 rounded-lg leading-relaxed">
-              "{r.content}"
-            </p>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2 text-xs">
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(r.verified)}
-                    onChange={(e) => moderate.mutate({ id: r.id, verified: e.target.checked })}
-                    className="rounded border-border"
-                  />
-                  <span>Verified Guest</span>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(r.featured)}
-                    onChange={(e) => moderate.mutate({ id: r.id, featured: e.target.checked })}
-                    className="rounded border-border"
-                  />
-                  <span>Feature in Carousel</span>
-                </label>
+            <p className="text-xs text-muted-foreground italic">"{r["comment"] as string}"</p>
+            <div className="flex items-center justify-between pt-2 border-t text-xs">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={Boolean(r["featured"])}
+                  onCheckedChange={(featured) =>
+                    moderateMut.mutate({ id: r["id"] as string, featured })
+                  }
+                />
+                <span className="text-[10px]">Featured on Home</span>
               </div>
-
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-destructive hover:bg-destructive/10 text-xs"
-                onClick={() => remove.mutate(r.id)}
+                className="h-6 text-[11px] text-destructive"
+                onClick={() => deleteMut.mutate(r["id"] as string)}
               >
-                <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                Delete
               </Button>
             </div>
           </Card>
@@ -1148,262 +2529,67 @@ function ReviewsModerator() {
   );
 }
 
+/* =========================================================================
+   9. INQUIRIES MODERATOR
+   ========================================================================= */
+
 function ContactInquiriesModerator() {
   const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-
-  const { data: rawInquiries = [], isLoading } = useQuery({
-    queryKey: ["contact-inquiries"],
+  const { data: contacts = [] } = useQuery({
+    queryKey: ["cms-contacts"],
     queryFn: () => listContactSubmissions(),
   });
 
-  const inquiries = (rawInquiries as ContactSubmission[]) || [];
-
-  const updateStatus = useMutation({
-    mutationFn: (vars: { id: string; status: "unread" | "read" | "replied" | "archived" }) =>
-      updateContactStatus({ data: vars }),
+  const updateStatusMut = useMutation({
+    mutationFn: (args: { id: string; status: "new" | "read" | "replied" | "archived" }) =>
+      updateContactStatus({ data: args }),
     onSuccess: () => {
-      toast.success("Inquiry status updated.");
-      queryClient.invalidateQueries({ queryKey: ["contact-inquiries"] });
+      queryClient.invalidateQueries({ queryKey: ["cms-contacts"] });
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (err) => toast.error((err as Error).message),
   });
-
-  const removeInquiry = useMutation({
-    mutationFn: (id: string) => deleteContactSubmission({ data: { id } }),
-    onSuccess: () => {
-      toast.success("Inquiry deleted from database.");
-      queryClient.invalidateQueries({ queryKey: ["contact-inquiries"] });
-    },
-    onError: (e) => toast.error((e as Error).message),
-  });
-
-  const filteredInquiries = inquiries.filter((inq) => {
-    const matchesStatus = statusFilter === "all" ? true : (inq.status || "unread") === statusFilter;
-    const matchesSearch =
-      searchTerm === "" ||
-      inq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inq.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inq.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inq.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (inq.phone && inq.phone.includes(searchTerm));
-    return matchesStatus && matchesSearch;
-  });
-
-  const unreadCount = inquiries.filter((i) => (i.status || "unread") === "unread").length;
-
-  if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading inquiries from Firebase…</p>;
-  }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-serif font-semibold flex items-center gap-2">
-            <Mail className="h-4 w-4 text-primary" />
-            <span>Guest Contact & Desk Inquiries</span>
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Messages and reservation questions submitted through the public Contact Us form.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-xs">
-              {unreadCount} Unread
-            </Badge>
-          )}
-          <Badge variant="outline" className="text-xs">
-            {inquiries.length} Total Received
-          </Badge>
-        </div>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="flex flex-wrap items-center gap-2 bg-card p-3 rounded-xl border border-border">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, email, subject, phone or content..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8 text-xs h-8"
-          />
-        </div>
-
-        <div className="flex items-center gap-1">
-          {["all", "unread", "read", "replied", "archived"].map((st) => (
-            <Button
-              key={st}
-              size="sm"
-              variant={statusFilter === st ? "default" : "outline"}
-              onClick={() => setStatusFilter(st)}
-              className="text-[11px] h-8 capitalize px-2.5"
-            >
-              {st}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {filteredInquiries.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted-foreground">
-          {inquiries.length === 0
-            ? "No contact submissions yet. Incoming messages submitted on the Contact page will appear here."
-            : "No inquiries matched your current filter criteria."}
-        </Card>
-      ) : (
-        <div className="grid gap-3">
-          {filteredInquiries.map((inq) => {
-            const status = inq.status || "unread";
-            const dateStr = inq.created_at
-              ? new Date(inq.created_at).toLocaleString("en-NG", {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                })
-              : "Recent";
-
-            return (
-              <Card
-                key={inq.id}
-                className={`p-4 sm:p-5 space-y-3 transition-colors ${
-                  status === "unread"
-                    ? "border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/10"
-                    : "bg-card"
-                }`}
+      <h3 className="font-serif text-sm font-semibold">Guest Messages &amp; Event Inquiries</h3>
+      <div className="space-y-2">
+        {(contacts as ContactSubmission[]).map((c) => (
+          <Card key={c.id} className="p-4 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-xs">{c.name}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  ({c.email} • {c.phone})
+                </span>
+              </div>
+              <span className="text-[10px] text-muted-foreground font-mono">
+                {new Date(c.created_at).toLocaleDateString()}
+              </span>
+            </div>
+            <p className="text-xs text-foreground/80 bg-muted/30 p-2.5 rounded-lg">{c.message}</p>
+            <div className="flex justify-end gap-2 pt-1 text-xs">
+              <a
+                href={`mailto:${c.email}`}
+                className="inline-flex h-6 items-center gap-1 rounded bg-primary px-2 text-[10px] text-primary-foreground font-medium"
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="font-semibold text-sm text-foreground">{inq.name}</h4>
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] uppercase font-mono ${
-                          status === "unread"
-                            ? "bg-amber-500/15 text-amber-600 border-amber-500/30 font-semibold"
-                            : status === "replied"
-                              ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
-                              : status === "archived"
-                                ? "bg-muted text-muted-foreground"
-                                : "bg-blue-500/15 text-blue-600 border-blue-500/30"
-                        }`}
-                      >
-                        {status}
-                      </Badge>
-                      <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {dateStr}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
-                      <span className="flex items-center gap-1 text-foreground font-medium">
-                        <Mail className="h-3 w-3 text-muted-foreground" />
-                        {inq.email}
-                      </span>
-                      {inq.phone && (
-                        <span className="flex items-center gap-1 text-foreground">
-                          <Phone className="h-3 w-3 text-muted-foreground" />
-                          {inq.phone}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {/* Quick direct response links */}
-                    <a
-                      href={`mailto:${inq.email}?subject=${encodeURIComponent(
-                        `Re: ${inq.subject} — Banky Hotel & Suites`,
-                      )}`}
-                      className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-[11px] font-medium hover:bg-muted"
-                    >
-                      <Mail className="h-3 w-3 text-primary" />
-                      <span>Email Reply</span>
-                    </a>
-
-                    {inq.phone && (
-                      <a
-                        href={whatsappLink(
-                          `Hello ${inq.name}, regarding your Banky Hotel & Suites inquiry: "${inq.subject}"...`,
-                          inq.phone.replace(/[^0-9]/g, ""),
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100"
-                      >
-                        <MessageSquare className="h-3 w-3" />
-                        <span>WhatsApp</span>
-                      </a>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="text-xs font-semibold text-foreground">
-                    Subject: {inq.subject}
-                  </div>
-                  <div className="rounded-lg bg-muted/40 p-3 text-xs sm:text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed border border-border/50">
-                    {inq.message}
-                  </div>
-                </div>
-
-                {/* Status Management Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2 text-xs">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground">Mark status:</span>
-                    {status !== "replied" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[11px] gap-1 text-emerald-600 hover:bg-emerald-50"
-                        onClick={() => updateStatus.mutate({ id: inq.id, status: "replied" })}
-                      >
-                        <Check className="h-3 w-3" /> Replied
-                      </Button>
-                    )}
-                    {status === "unread" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[11px] gap-1"
-                        onClick={() => updateStatus.mutate({ id: inq.id, status: "read" })}
-                      >
-                        Read
-                      </Button>
-                    )}
-                    {status !== "unread" && status !== "archived" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[11px] gap-1 text-muted-foreground"
-                        onClick={() => updateStatus.mutate({ id: inq.id, status: "archived" })}
-                      >
-                        <Archive className="h-3 w-3" /> Archive
-                      </Button>
-                    )}
-                  </div>
-
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-destructive hover:bg-destructive/10 text-[11px]"
-                    onClick={() => {
-                      if (confirm(`Delete message from ${inq.name}?`)) {
-                        removeInquiry.mutate(inq.id);
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" /> Delete
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                <Mail className="h-3 w-3" />
+                Reply by Email
+              </a>
+              {c.phone && (
+                <a
+                  href={`https://wa.me/${c.phone.replace(/[^0-9]/g, "")}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-6 items-center gap-1 rounded bg-emerald-600 px-2 text-[10px] text-white font-medium"
+                >
+                  <Phone className="h-3 w-3" />
+                  WhatsApp
+                </a>
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

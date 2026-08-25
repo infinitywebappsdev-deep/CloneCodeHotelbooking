@@ -11,6 +11,8 @@ import {
 import { checkRoomAvailability, AvailabilityCheckResult } from "@/lib/availability";
 import { RoomAvailabilityStatus } from "@/components/site/RoomAvailabilityStatus";
 import { BookingSummarySkeleton } from "@/components/site/BookingSkeleton";
+import { DateRangePicker } from "@/components/site/DateRangePicker";
+import { PaystackCheckout } from "@/components/site/PaystackCheckout";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -29,6 +31,8 @@ import {
   ExternalLink,
   Info,
   Clock,
+  BedDouble,
+  CreditCard,
 } from "lucide-react";
 
 interface SearchParams {
@@ -382,8 +386,19 @@ function ReservePage() {
               </div>
             </div>
 
+            {/* Paystack Online Payment Integration */}
+            <div className="mt-8">
+              <PaystackCheckout
+                bookingReference={confirmedData.reference}
+                amount={confirmedData.estimatedTotal}
+                guestEmail={confirmedData.guestEmail}
+                guestName={confirmedData.guestName}
+                roomName={confirmedData.roomName}
+              />
+            </div>
+
             {/* Actions Grid */}
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <a
                 href={whatsappLink(
                   `Hello Banky Hotel & Suites, I have submitted booking inquiry ${confirmedData.reference} for ${confirmedData.roomName} (${confirmedData.checkIn} to ${confirmedData.checkOut}) under the name ${confirmedData.guestName}. I would like to verify and finalize my reservation.`,
@@ -402,9 +417,9 @@ function ReservePage() {
                 target="_blank"
                 rel="noreferrer"
                 id="paystack-complete-payment-btn"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-center text-xs font-medium tracking-[0.16em] uppercase text-primary-foreground shadow-md transition-opacity hover:opacity-90"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-muted/60 px-6 py-3.5 text-center text-xs font-medium tracking-[0.16em] uppercase text-foreground shadow-sm transition-opacity hover:bg-muted"
               >
-                <span>Pay via Paystack</span>
+                <span>Paystack Direct Link</span>
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
             </div>
@@ -452,109 +467,177 @@ function ReservePage() {
                 </div>
               )}
 
-              <div className="grid gap-6 sm:grid-cols-2">
-                <Field label="Full Name" required>
-                  <input
-                    id="guest-name-input"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Dr. Folashade Adeyemi"
-                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
-                  />
-                </Field>
+              {/* Interactive Visual Room Selector */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <BedDouble className="h-3.5 w-3.5 text-primary" />
+                    1. Select Room or Suite
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {ROOMS.length} curated categories available
+                  </span>
+                </div>
 
-                <Field label="Email Address" required>
-                  <input
-                    id="guest-email-input"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. folashade@example.com"
-                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
-                  />
-                </Field>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {ROOMS.map((r) => {
+                    const isSelected = r.slug === slug;
+                    return (
+                      <button
+                        key={r.slug}
+                        type="button"
+                        onClick={() => setSlug(r.slug)}
+                        className={`group relative overflow-hidden rounded-xl border text-left transition-all p-2.5 flex flex-col justify-between ${
+                          isSelected
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/40 shadow-md"
+                            : "border-border/80 bg-card hover:border-border hover:bg-muted/30"
+                        }`}
+                      >
+                        <div className="relative h-20 w-full overflow-hidden rounded-lg bg-muted">
+                          <img
+                            src={r.image}
+                            alt={r.name}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                          {isSelected && (
+                            <div className="absolute top-1.5 right-1.5 rounded-full bg-primary p-0.5 text-primary-foreground shadow">
+                              <Check className="h-3 w-3" />
+                            </div>
+                          )}
+                        </div>
 
-                <Field label="Phone / WhatsApp Number" required>
-                  <input
-                    id="guest-phone-input"
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. +234 803 000 0000"
-                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
-                  />
-                </Field>
+                        <div className="mt-2 space-y-0.5">
+                          <h4 className="font-serif text-xs font-bold leading-tight line-clamp-1 text-foreground">
+                            {r.name}
+                          </h4>
+                          <p className="text-[11px] font-semibold text-primary font-serif">
+                            {naira(r.rate)}
+                            <span className="text-[9px] font-sans font-normal text-muted-foreground">
+                              /nt
+                            </span>
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-                <Field label="Selected Room / Suite" required>
-                  <select
-                    id="room-select-input"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                    className="w-full bg-transparent text-sm outline-none cursor-pointer"
+              {/* Date & Guest Selection */}
+              <div className="space-y-4 pt-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-primary" />
+                  2. Dates & Occupancy
+                </span>
+
+                <DateRangePicker
+                  checkIn={checkIn}
+                  checkOut={checkOut}
+                  onChange={(cIn, cOut) => {
+                    setCheckIn(cIn);
+                    setCheckOut(cOut);
+                  }}
+                  className="rounded-xl border border-border/80 p-4 bg-muted/20"
+                />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Selected Room Category">
+                    <select
+                      id="room-select-input"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value)}
+                      className="w-full bg-transparent text-sm outline-none cursor-pointer"
+                    >
+                      {ROOMS.map((r) => (
+                        <option
+                          key={r.slug}
+                          value={r.slug}
+                          className="bg-background text-foreground"
+                        >
+                          {r.name} — {naira(r.rate)} / night
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Number of Guests">
+                    <select
+                      id="guests-count-input"
+                      value={guests}
+                      onChange={(e) => setGuests(e.target.value)}
+                      className="w-full bg-transparent text-sm outline-none cursor-pointer"
+                    >
+                      {["1 Guest", "2 Guests", "3 Guests", "4 Guests", "5+ Guests"].map((g, i) => (
+                        <option
+                          key={g}
+                          value={`${i + 1}`}
+                          className="bg-background text-foreground"
+                        >
+                          {g}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </div>
+
+              {/* Guest Personal Information */}
+              <div className="space-y-4 pt-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-primary" />
+                  3. Guest Contact & Special Requests
+                </span>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Full Name" required>
+                    <input
+                      id="guest-name-input"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Dr. Folashade Adeyemi"
+                      className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+                    />
+                  </Field>
+
+                  <Field label="Email Address" required>
+                    <input
+                      id="guest-email-input"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="e.g. folashade@example.com"
+                      className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+                    />
+                  </Field>
+
+                  <Field label="Phone / WhatsApp Number" required className="sm:col-span-2">
+                    <input
+                      id="guest-phone-input"
+                      type="tel"
+                      required
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="e.g. +234 803 000 0000"
+                      className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+                    />
+                  </Field>
+
+                  <Field
+                    label="Special Requests / Arrival Notes (Optional)"
+                    className="sm:col-span-2"
                   >
-                    {ROOMS.map((r) => (
-                      <option key={r.slug} value={r.slug} className="bg-background text-foreground">
-                        {r.name} — {naira(r.rate)} / night
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Arrival Date (Check-in 2:00 PM)" required>
-                  <input
-                    id="checkin-date-input"
-                    type="date"
-                    required
-                    min={new Date().toISOString().split("T")[0]}
-                    value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
-                    className="w-full bg-transparent text-sm outline-none"
-                  />
-                </Field>
-
-                <Field label="Departure Date (Check-out 12:00 PM)" required>
-                  <input
-                    id="checkout-date-input"
-                    type="date"
-                    required
-                    min={checkIn || new Date().toISOString().split("T")[0]}
-                    value={checkOut}
-                    onChange={(e) => setCheckOut(e.target.value)}
-                    className="w-full bg-transparent text-sm outline-none"
-                  />
-                </Field>
-
-                <Field label="Number of Guests">
-                  <select
-                    id="guests-count-input"
-                    value={guests}
-                    onChange={(e) => setGuests(e.target.value)}
-                    className="w-full bg-transparent text-sm outline-none cursor-pointer"
-                  >
-                    {["1 Guest", "2 Guests", "3 Guests", "4 Guests", "5+ Guests"].map((g, i) => (
-                      <option key={g} value={`${i + 1}`} className="bg-background text-foreground">
-                        {g}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field
-                  label="Special Requests / Arrival Notes (Optional)"
-                  className="sm:col-span-2"
-                >
-                  <textarea
-                    id="special-requests-input"
-                    rows={3}
-                    value={specialRequests}
-                    onChange={(e) => setSpecialRequests(e.target.value)}
-                    placeholder="e.g. Late check-in after 8:00 PM, quiet high-floor room, dietary preferences, anniversary arrangement..."
-                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50 resize-none"
-                  />
-                </Field>
+                    <textarea
+                      id="special-requests-input"
+                      rows={2}
+                      value={specialRequests}
+                      onChange={(e) => setSpecialRequests(e.target.value)}
+                      placeholder="e.g. Late check-in after 8:00 PM, quiet high-floor room, dietary preferences, anniversary arrangement..."
+                      className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50 resize-none"
+                    />
+                  </Field>
+                </div>
               </div>
 
               {/* Real-Time Room Availability Checker Banner */}

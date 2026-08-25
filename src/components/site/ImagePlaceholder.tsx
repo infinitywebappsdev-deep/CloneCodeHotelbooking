@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ImageOff, Sparkles, RefreshCw } from "lucide-react";
 
 interface ImagePlaceholderProps {
@@ -27,10 +27,13 @@ export function ImagePlaceholder({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
-    setIsLoaded(false);
-    setHasError(false);
+    // If image is already complete in memory/cache, mark loaded immediately
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setIsLoaded(true);
+    }
   }, [src, retryKey]);
 
   const aspectClass = {
@@ -48,7 +51,7 @@ export function ImagePlaceholder({
     >
       {/* Luxury Ambient Shimmer Placeholder (Visible until image loads) */}
       {!isLoaded && !hasError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-950 text-neutral-400">
+        <div className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-950 text-neutral-400 pointer-events-none">
           {/* Animated Gold Shimmer Gradient */}
           <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
@@ -64,9 +67,15 @@ export function ImagePlaceholder({
         </div>
       )}
 
-      {/* Actual Image with Progressive Fade-in */}
+      {/* Actual Image */}
       {!hasError && (
         <img
+          ref={(node) => {
+            imgRef.current = node;
+            if (node && node.complete && node.naturalWidth > 0 && !isLoaded) {
+              setIsLoaded(true);
+            }
+          }}
           key={retryKey}
           src={src}
           alt={alt}
@@ -81,8 +90,8 @@ export function ImagePlaceholder({
             setHasError(true);
             setIsLoaded(true);
           }}
-          className={`h-full w-full object-cover transition-all duration-700 ease-out ${
-            isLoaded ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-105 blur-sm"
+          className={`h-full w-full object-cover transition-opacity duration-300 ${
+            isLoaded ? "opacity-100" : "opacity-0"
           } ${imgClassName}`}
         />
       )}
@@ -99,6 +108,8 @@ export function ImagePlaceholder({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
+              setHasError(false);
+              setIsLoaded(false);
               setRetryKey((k) => k + 1);
             }}
             className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white hover:bg-white/20 transition-colors"

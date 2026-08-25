@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import heroVideo from "@/assets/hero-video.mp4.asset.json";
 import heroPoster from "@/assets/hero-exterior.jpg";
 import hotelLobby from "@/assets/Hotel Lobby.jpg";
@@ -6,11 +7,12 @@ import diningImg from "@/assets/Restaurant 2.jpg";
 import loungeImg from "@/assets/OpenBar Garden.jpg";
 import eventsImg from "@/assets/BankyHall.jpg";
 import { BookingBar } from "@/components/site/BookingBar";
+import { HeroCarousel } from "@/components/site/HeroCarousel";
 import { RoomShowcase } from "@/components/site/RoomShowcase";
 import { MasonryGallery } from "@/components/site/MasonryGallery";
 import { TestimonialSlider } from "@/components/site/TestimonialSlider";
 import { HotelLocationMap } from "@/components/site/HotelLocationMap";
-import { Sparkles, Compass, ShieldCheck, ArrowRight, Camera } from "lucide-react";
+import { Sparkles, Compass, ShieldCheck, ArrowRight, Camera, Film, Layers } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -36,54 +38,94 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const [heroMode, setHeroMode] = useState<"carousel" | "video">("carousel");
+
   return (
     <>
-      {/* Hero Video & Direct Booking */}
-      <section className="relative h-[100svh] min-h-[640px] w-full overflow-hidden">
-        <video
-          className="absolute inset-0 h-full w-full object-cover"
-          autoPlay
-          muted
-          loop
-          playsInline
-          poster={heroPoster}
-        >
-          <source src={heroVideo.url} type="video/mp4" />
-        </video>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/30 to-black/75" />
+      {/* Hero Showcase (Carousel or Cinematic Video) */}
+      <section className="relative w-full overflow-hidden">
+        {heroMode === "carousel" ? (
+          <HeroCarousel />
+        ) : (
+          <div className="relative h-[100svh] min-h-[640px] w-full overflow-hidden">
+            <video
+              className="absolute inset-0 h-full w-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+              poster={heroPoster}
+            >
+              <source src={heroVideo.url} type="video/mp4" />
+            </video>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/30 to-black/75" />
 
-        <div className="container-x relative flex h-full flex-col justify-end pb-10">
-          <div className="rise max-w-2xl pb-10 text-white">
-            <span className="eyebrow text-amber-300/90 flex items-center gap-2">
-              <Sparkles className="h-3 w-3" />
-              Ado-Ekiti · Ekiti State · Nigeria
-            </span>
-            <h1 className="mt-4 text-5xl leading-[1.05] sm:text-7xl font-display">
-              Quiet luxury in the heart of Ado-Ekiti
-            </h1>
-            <p className="mt-5 max-w-lg text-base leading-relaxed text-white/90 font-light">
-              Twenty-eight curated rooms and luxury suites, an open-air bar garden, and Nigerian
-              fine dining — elevated by hospitality that anticipates your every need.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                to="/reserve"
-                id="hero-reserve-btn"
-                className="rounded-full bg-white px-8 py-3.5 text-xs font-semibold tracking-[0.18em] uppercase text-black shadow-lg hover:bg-white/90 transition-transform active:scale-95"
-              >
-                Reserve Your Stay
-              </Link>
-              <Link
-                to="/rooms"
-                id="hero-explore-rooms-btn"
-                className="rounded-full border border-white/40 bg-black/30 px-7 py-3.5 text-xs font-semibold tracking-[0.18em] uppercase text-white backdrop-blur-md hover:bg-white/20 transition-colors"
-              >
-                Explore Rooms
-              </Link>
+            <div className="container-x relative flex h-full flex-col justify-end pb-10">
+              <div className="rise max-w-2xl pb-10 text-white">
+                <span className="eyebrow text-amber-300/90 flex items-center gap-2">
+                  <Sparkles className="h-3 w-3" />
+                  Ado-Ekiti · Ekiti State · Nigeria
+                </span>
+                <h1 className="mt-4 text-5xl leading-[1.05] sm:text-7xl font-display">
+                  Quiet luxury in the heart of Ado-Ekiti
+                </h1>
+                <p className="mt-5 max-w-lg text-base leading-relaxed text-white/90 font-light">
+                  Twenty-eight curated rooms and luxury suites, an open-air bar garden, and Nigerian
+                  fine dining — elevated by hospitality that anticipates your every need.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <Link
+                    to="/reserve"
+                    id="hero-reserve-btn"
+                    className="rounded-full bg-white px-8 py-3.5 text-xs font-semibold tracking-[0.18em] uppercase text-black shadow-lg hover:bg-white/90 transition-transform active:scale-95"
+                  >
+                    Reserve Your Stay
+                  </Link>
+                  <Link
+                    to="/rooms"
+                    id="hero-explore-rooms-btn"
+                    className="rounded-full border border-white/40 bg-black/30 px-7 py-3.5 text-xs font-semibold tracking-[0.18em] uppercase text-white backdrop-blur-md hover:bg-white/20 transition-colors"
+                  >
+                    Explore Rooms
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
-          <BookingBar floating />
+        )}
+
+        {/* View Mode Toggle Pill */}
+        <div className="absolute top-24 right-4 sm:right-8 z-30 flex items-center gap-1 rounded-full border border-white/20 bg-black/60 p-1 backdrop-blur-md text-[11px] text-white">
+          <button
+            type="button"
+            onClick={() => setHeroMode("carousel")}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 font-medium transition-all ${
+              heroMode === "carousel"
+                ? "bg-amber-400 text-black font-semibold shadow-sm"
+                : "hover:text-white/90 text-white/70"
+            }`}
+          >
+            <Layers className="h-3 w-3" />
+            <span>Suites & Facilities</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setHeroMode("video")}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 font-medium transition-all ${
+              heroMode === "video"
+                ? "bg-amber-400 text-black font-semibold shadow-sm"
+                : "hover:text-white/90 text-white/70"
+            }`}
+          >
+            <Film className="h-3 w-3" />
+            <span>Cinematic Film</span>
+          </button>
         </div>
+      </section>
+
+      {/* Floating / Sticky Quick Booking Bar */}
+      <section className="relative -mt-8 z-30 container-x">
+        <BookingBar floating />
       </section>
 
       {/* Boutique Story / Introduction */}

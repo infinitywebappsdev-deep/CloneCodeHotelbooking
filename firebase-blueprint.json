@@ -160,6 +160,25 @@
         "created_at": { "type": "string", "maxLength": 40 }
       },
       "required": ["name", "email", "subject", "message"]
+    },
+    "user_roles": {
+      "title": "UserRole",
+      "description": "Hotel staff and administrator user accounts, roles, departments, and granular privilege access control",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 120 },
+        "full_name": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["super_admin", "admin", "manager", "front_desk", "housekeeping", "content_editor", "accountant", "staff"], "maxLength": 40 },
+        "privileges": { "type": "array" },
+        "department": { "type": "string", "maxLength": 80 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["active", "suspended", "pending_invite"], "maxLength": 30 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "created_at": { "type": "string", "maxLength": 40 },
+        "updated_at": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["email", "role"]
     }
   },
   "firestore": {
@@ -202,6 +221,10 @@
     "/audit_logs/{docId}": {
       "schema": "audit_logs",
       "description": "Admin operational audit trail"
+    },
+    "/user_roles/{docId}": {
+      "schema": "user_roles",
+      "description": "Staff roles, permissions, and administrative access control"
     }
   }
 }
