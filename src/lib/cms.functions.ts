@@ -3,15 +3,7 @@ import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 import { firestoreRest } from "./firebase-server";
 import { z } from "zod";
 import { parseFriendly } from "./cms-validation";
-
-async function assertStaff(context: { userId: string }) {
-  const roles = await firestoreRest.list<{ user_id: string; role: string }>("user_roles");
-  const userRoles = roles.filter((r) => r.user_id === context.userId).map((r) => r.role);
-  if (!userRoles.includes("admin") && !userRoles.includes("staff")) {
-    if (roles.length === 0) return;
-    throw new Error("Forbidden: staff access only.");
-  }
-}
+import { assertStaff } from "./auth-roles";
 
 async function audit(
   context: { userId: string; claims: Record<string, unknown> },
@@ -181,7 +173,7 @@ export const saveGalleryImage = createServerFn({ method: "POST" })
     parseFriendly(
       z.object({
         id: z.string().optional(),
-        url: z.string().trim().min(1).max(600),
+        url: z.string().trim().min(1).max(10_000_000),
         caption: z.string().max(200),
         category: z.string().max(60),
         sort_order: z.number().int().min(0).max(999),
@@ -362,5 +354,215 @@ export const rollbackPage = createServerFn({ method: "POST" })
     await audit(context, "cms.page_rolled_back", "pages", pageId, {
       restored_version: version["version"],
     });
+    return { ok: true };
+  });
+
+/* ---------- F&B Restaurant & Bar Menu CMS ---------- */
+
+export const listMenuItems = createServerFn({ method: "GET" })
+  .middleware([requireFirebaseAuth])
+  .handler(async ({ context }) => {
+    await assertStaff(context);
+    const items = await firestoreRest.list<Record<string, unknown>>("menu_items");
+    return items.sort((a, b) => Number(a["sort_order"] || 0) - Number(b["sort_order"] || 0));
+  });
+
+export const saveMenuItem = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((d: unknown) =>
+    parseFriendly(
+      z.object({
+        id: z.string().optional(),
+        name: z.string().trim().min(2).max(120),
+        category: z.string().trim().min(2).max(80),
+        description: z.string().max(500).default(""),
+        price: z.number().int().min(0).max(10_000_000),
+        in_stock: z.boolean().default(true),
+        tags: z.array(z.string()).default([]),
+        sort_order: z.number().int().min(0).max(999).default(0),
+      }),
+      d,
+    ),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
+    const { id, ...values } = data;
+    if (id) {
+      await firestoreRest.patch("menu_items", id, {
+        ...values,
+        updated_at: new Date().toISOString(),
+      });
+      await audit(context, "cms.menu_item_updated", "menu_items", id, { name: data.name });
+    } else {
+      const created = await firestoreRest.create("menu_items", {
+        ...values,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      await audit(context, "cms.menu_item_created", "menu_items", created.id, { name: data.name });
+    }
+    return { ok: true };
+  });
+
+export const deleteMenuItem = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((d: { id: string }) => parseFriendly(z.object({ id: z.string() }), d))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
+    await firestoreRest.delete("menu_items", data.id);
+    await audit(context, "cms.menu_item_deleted", "menu_items", data.id);
+    return { ok: true };
+  });
+
+/* ---------- Promotional Coupons & Discount Vouchers CMS ---------- */
+
+export const listCoupons = createServerFn({ method: "GET" })
+  .middleware([requireFirebaseAuth])
+  .handler(async ({ context }) => {
+    await assertStaff(context);
+    const rows = await firestoreRest.list<Record<string, unknown>>("coupons");
+    return rows.sort((a, b) =>
+      String(b["created_at"] ?? "").localeCompare(String(a["created_at"] ?? "")),
+    );
+  });
+
+export const saveCoupon = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((d: unknown) =>
+    parseFriendly(
+      z.object({
+        id: z.string().optional(),
+        code: z
+          .string()
+          .trim()
+          .min(3)
+          .max(30)
+          .transform((v) => v.toUpperCase()),
+        discount_type: z.enum(["percentage", "fixed"]),
+        discount_value: z.number().int().min(1),
+        min_spend: z.number().int().min(0).default(0),
+        max_uses: z.number().int().min(1).default(100),
+        uses_count: z.number().int().min(0).default(0),
+        valid_until: z.string().default(""),
+        active: z.boolean().default(true),
+      }),
+      d,
+    ),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
+    const { id, ...values } = data;
+    if (id) {
+      await firestoreRest.patch("coupons", id, {
+        ...values,
+        updated_at: new Date().toISOString(),
+      });
+      await audit(context, "cms.coupon_updated", "coupons", id, { code: data.code });
+    } else {
+      const created = await firestoreRest.create("coupons", {
+        ...values,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      await audit(context, "cms.coupon_created", "coupons", created.id, { code: data.code });
+    }
+    return { ok: true };
+  });
+
+export const deleteCoupon = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((d: { id: string }) => parseFriendly(z.object({ id: z.string() }), d))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
+    await firestoreRest.delete("coupons", data.id);
+    await audit(context, "cms.coupon_deleted", "coupons", data.id);
+    return { ok: true };
+  });
+
+/* ---------- Staff Manual Push Notifications & High-Priority Alerts ---------- */
+
+export const listStaffDispatches = createServerFn({ method: "GET" })
+  .middleware([requireFirebaseAuth])
+  .handler(async ({ context }) => {
+    await assertStaff(context);
+    const rows = await firestoreRest.list<Record<string, unknown>>("staff_dispatches");
+    return rows.sort((a, b) =>
+      String(b["created_at"] ?? "").localeCompare(String(a["created_at"] ?? "")),
+    );
+  });
+
+export const broadcastStaffAlert = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((d: unknown) =>
+    parseFriendly(
+      z.object({
+        priority: z.enum(["urgent", "high", "normal", "announcement"]),
+        department: z.enum(["all", "front_desk", "housekeeping", "maintenance", "kitchen"]),
+        category: z.string().trim().min(2).max(100),
+        title: z.string().trim().min(3).max(150),
+        message: z.string().trim().min(5).max(1500),
+      }),
+      d,
+    ),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
+    const record = await firestoreRest.create("staff_dispatches", {
+      ...data,
+      sender_id: context.userId,
+      sender_email: (context.claims?.["email"] as string) ?? "",
+      status: "broadcasted",
+      created_at: new Date().toISOString(),
+    });
+    await audit(context, "staff.alert_broadcasted", "staff_dispatches", record.id, {
+      priority: data.priority,
+      title: data.title,
+    });
+    return { ok: true, id: record.id };
+  });
+
+/* ---------- Guest Reviews & Testimonials Moderation ---------- */
+
+export const listAdminTestimonials = createServerFn({ method: "GET" })
+  .middleware([requireFirebaseAuth])
+  .handler(async ({ context }) => {
+    await assertStaff(context);
+    const rows = await firestoreRest.list<Record<string, unknown>>("testimonials");
+    return rows.sort((a, b) =>
+      String(b["created_at"] ?? "").localeCompare(String(a["created_at"] ?? "")),
+    );
+  });
+
+export const moderateTestimonial = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((d: unknown) =>
+    parseFriendly(
+      z.object({
+        id: z.string(),
+        verified: z.boolean().optional(),
+        featured: z.boolean().optional(),
+        staff_response: z.string().max(1000).optional(),
+      }),
+      d,
+    ),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
+    const { id, ...updates } = data;
+    await firestoreRest.patch("testimonials", id, {
+      ...updates,
+      updated_at: new Date().toISOString(),
+    });
+    await audit(context, "testimonials.moderated", "testimonials", id, updates);
+    return { ok: true };
+  });
+
+export const deleteAdminTestimonial = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((d: { id: string }) => parseFriendly(z.object({ id: z.string() }), d))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
+    await firestoreRest.delete("testimonials", data.id);
+    await audit(context, "testimonials.deleted", "testimonials", data.id);
     return { ok: true };
   });

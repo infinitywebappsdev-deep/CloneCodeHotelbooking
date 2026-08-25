@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHero } from "@/components/site/PageHero";
 import hotelLobby from "@/assets/Hotel Lobby.jpg";
 import { MasonryGallery } from "@/components/site/MasonryGallery";
-import { Sparkles, ShieldCheck, MapPin } from "lucide-react";
+import { Sparkles, Bed, Utensils, PartyPopper, ShieldCheck, MapPin } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/gallery")({
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/gallery")({
       {
         name: "description",
         content:
-          "Explore the luxury suites, hotel amenities, Ballard lounge, Restaurant 2, open-air bar garden, and Banky Hall through our interactive high-definition photo gallery.",
+          "Explore all 33 photographs of luxury suites, hotel amenities, Ballard lounge, Restaurant 2, open-air bar garden, and Banky Hall through our interactive high-definition photo gallery.",
       },
       { property: "og:title", content: "Interactive Photo Gallery — Banky Hotel & Suites" },
       {
@@ -35,9 +35,41 @@ function GalleryPage() {
         image={hotelLobby}
       />
 
-      <section className="container-x py-20">
+      <section className="container-x py-16">
+        {/* Quick Highlights Row */}
+        <div className="mb-14 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm">
+            <Bed className="h-5 w-5 text-primary mb-2" />
+            <div className="font-display text-2xl sm:text-3xl text-foreground">28 Rooms</div>
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1">
+              Curated Suites & Rooms
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm">
+            <Utensils className="h-5 w-5 text-amber-500 mb-2" />
+            <div className="font-display text-2xl sm:text-3xl text-foreground">Restaurant 2</div>
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1">
+              Fine Dining & Open Bar
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm">
+            <PartyPopper className="h-5 w-5 text-emerald-600 mb-2" />
+            <div className="font-display text-2xl sm:text-3xl text-foreground">300 Guests</div>
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1">
+              Banky Hall Ballroom
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm">
+            <ShieldCheck className="h-5 w-5 text-primary mb-2" />
+            <div className="font-display text-2xl sm:text-3xl text-foreground">24/7 Power</div>
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1">
+              Solar & Generator Substation
+            </div>
+          </div>
+        </div>
+
         {/* Interactive Masonry Gallery with Lightbox */}
-        <MasonryGallery showFilters={true} />
+        <MasonryGallery showFilters={true} showSearch={true} showViewToggle={true} />
 
         {/* Direct Booking Call to Action */}
         <div className="mt-20 relative overflow-hidden rounded-3xl border border-white/20 bg-card/80 px-8 py-14 text-center shadow-xl backdrop-blur-xl">

@@ -149,3 +149,9 @@
 @utility ticker-track {
   animation: ticker 34s linear infinite;
 }
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

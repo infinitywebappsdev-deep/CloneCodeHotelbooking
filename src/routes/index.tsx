@@ -218,7 +218,7 @@ function Home() {
               id="home-explore-full-gallery-btn"
               className="inline-flex items-center gap-2 rounded-full border border-border px-6 py-3 text-xs font-semibold tracking-wider uppercase text-foreground hover:bg-muted transition-colors"
             >
-              <span>View All 24 Spaces</span>
+              <span>View All 33 Spaces</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>

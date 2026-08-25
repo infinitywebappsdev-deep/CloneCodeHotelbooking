@@ -1,9 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useId } from "react";
+import { useState, useId, useEffect, useCallback } from "react";
 import { PageHero } from "@/components/site/PageHero";
 import suite from "@/assets/Signature Suite.jpg";
 import { ROOMS, HOTEL, naira, whatsappLink, bookingMessage } from "@/lib/hotel";
 import { submitReservationInquiry } from "@/lib/ai.functions";
+import {
+  BookingSuccessModal,
+  BookingConfirmationDetails,
+} from "@/components/site/BookingSuccessModal";
+import { checkRoomAvailability, AvailabilityCheckResult } from "@/lib/availability";
+import { RoomAvailabilityStatus } from "@/components/site/RoomAvailabilityStatus";
+import { BookingSummarySkeleton } from "@/components/site/BookingSkeleton";
+import { toast } from "sonner";
 import {
   CheckCircle2,
   Sparkles,
@@ -19,6 +27,8 @@ import {
   RotateCcw,
   Printer,
   ExternalLink,
+  Info,
+  Clock,
 } from "lucide-react";
 
 interface SearchParams {
@@ -76,49 +86,116 @@ function ReservePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [confirmedData, setConfirmedData] = useState<{
-    reference: string;
-    aiConfirmation: string;
-    guestName: string;
-    roomName: string;
-    checkIn: string;
-    checkOut: string;
-    guestsCount: number;
-    estimatedTotal: number;
-  } | null>(null);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [confirmedData, setConfirmedData] = useState<BookingConfirmationDetails | null>(null);
 
   const [copiedRef, setCopiedRef] = useState(false);
 
+  // Real-Time Room Availability State
+  const [availabilityResult, setAvailabilityResult] = useState<AvailabilityCheckResult | null>(
+    null,
+  );
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+
+  const runAvailabilityCheck = useCallback(
+    async (rSlug: string, cIn: string, cOut: string, gCount: string) => {
+      if (!cIn || !cOut) {
+        setAvailabilityResult(null);
+        return;
+      }
+      setIsCheckingAvailability(true);
+      try {
+        const res = await checkRoomAvailability({
+          roomSlug: rSlug,
+          checkIn: cIn,
+          checkOut: cOut,
+          guestsCount: parseInt(gCount, 10) || 2,
+        });
+        setAvailabilityResult(res);
+      } catch (e) {
+        console.error("Availability check failed:", e);
+      } finally {
+        setIsCheckingAvailability(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      runAvailabilityCheck(slug, checkIn, checkOut, guests);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [slug, checkIn, checkOut, guests, runAvailabilityCheck]);
+
   const room = ROOMS.find((r) => r.slug === slug) || ROOMS[0]!;
   const n = nights(checkIn, checkOut);
-  const total = n > 0 ? n * room.rate : room.rate;
+  const baseSubtotal = n > 0 ? n * room.rate : room.rate;
+  const calculatedTotal = availabilityResult?.priceBreakdown?.total ?? baseSubtotal;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
 
     if (!name.trim()) {
-      setErrorMessage("Please enter your full name.");
+      const msg = "Please enter your full name.";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
     if (!email.trim() || !email.includes("@")) {
-      setErrorMessage("Please enter a valid email address.");
+      const msg = "Please enter a valid email address.";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
     if (!phone.trim()) {
-      setErrorMessage("Please enter your phone or WhatsApp number.");
+      const msg = "Please enter your phone or WhatsApp number.";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
     if (!checkIn) {
-      setErrorMessage("Please select your arrival date.");
+      const msg = "Please select your arrival date.";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
     if (!checkOut) {
-      setErrorMessage("Please select your departure date.");
+      const msg = "Please select your departure date.";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
     if (new Date(checkOut) <= new Date(checkIn)) {
-      setErrorMessage("Departure date must be after arrival date.");
+      const msg = "Departure date must be after arrival date.";
+      setErrorMessage(msg);
+      toast.error(msg);
+      return;
+    }
+
+    // Availability validation check
+    if (isCheckingAvailability) {
+      const msg = "Verifying live room availability with front desk. Please wait a moment...";
+      toast.info(msg);
+      return;
+    }
+
+    if (availabilityResult?.status === "unavailable") {
+      const msg = `${room.name} is fully booked for your selected dates. Please switch to an available suite or select different dates.`;
+      setErrorMessage(msg);
+      toast.error("Suite Unavailable for Selected Dates", {
+        description: msg,
+        duration: 5000,
+      });
+      return;
+    }
+
+    if (availabilityResult?.status === "invalid_dates") {
+      const msg =
+        availabilityResult.message || "Invalid dates chosen. Please adjust your calendar dates.";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
 
@@ -136,27 +213,44 @@ function ReservePage() {
           checkOut,
           guestsCount: parseInt(guests, 10) || 2,
           specialRequests: specialRequests.trim(),
-          estimatedTotal: total,
+          estimatedTotal: calculatedTotal,
         },
       });
 
       if (result && result.ok) {
-        setConfirmedData({
+        const confDetails: BookingConfirmationDetails = {
           reference: result.reference,
           aiConfirmation: result.aiConfirmation,
           guestName: result.guestName,
+          guestEmail: email.trim(),
+          guestPhone: phone.trim(),
+          roomSlug: room.slug,
           roomName: result.roomName,
           checkIn: result.checkIn,
           checkOut: result.checkOut,
           guestsCount: result.guestsCount,
           estimatedTotal: result.estimatedTotal,
+          nightsCount: n,
+          baseRate: room.rate,
+        };
+
+        setConfirmedData(confDetails);
+        setIsSuccessModalOpen(true);
+
+        toast.success("Reservation confirmed successfully!", {
+          description: `Booking reference: ${result.reference}. Concierge dispatched.`,
+          duration: 6000,
         });
       } else {
-        setErrorMessage("Something went wrong processing your inquiry. Please try again.");
+        const msg = "Something went wrong processing your inquiry. Please try again.";
+        setErrorMessage(msg);
+        toast.error(msg);
       }
     } catch (err: unknown) {
       console.error("Reservation inquiry submission failed:", err);
-      setErrorMessage("Could not connect to reservation server. Please verify your details.");
+      const msg = "Could not connect to reservation server. Please verify your details.";
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -463,11 +557,19 @@ function ReservePage() {
                 </Field>
               </div>
 
-              <div className="pt-4">
+              {/* Real-Time Room Availability Checker Banner */}
+              <RoomAvailabilityStatus
+                result={availabilityResult}
+                isChecking={isCheckingAvailability}
+                onSelectAlternative={(altSlug) => setSlug(altSlug)}
+                onRetryCheck={() => runAvailabilityCheck(slug, checkIn, checkOut, guests)}
+              />
+
+              <div className="pt-2">
                 <button
                   type="submit"
                   id="submit-inquiry-btn"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || availabilityResult?.status === "unavailable"}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-primary px-10 py-4 text-xs font-medium tracking-[0.2em] uppercase text-primary-foreground shadow-lg transition-all hover:opacity-90 disabled:opacity-50"
                 >
                   {isSubmitting ? (
@@ -503,8 +605,27 @@ function ReservePage() {
                 </div>
               </div>
 
-              <div className="mt-6 overflow-hidden rounded-xl bg-muted">
+              <div className="mt-6 overflow-hidden rounded-xl bg-muted relative">
                 <img src={room.image} alt={room.name} className="h-36 w-full object-cover" />
+                {availabilityResult && (
+                  <div className="absolute top-2.5 right-2.5">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-sm ${
+                        availabilityResult.status === "available"
+                          ? "bg-emerald-600/90 text-white"
+                          : availabilityResult.status === "limited"
+                            ? "bg-amber-600/90 text-white"
+                            : "bg-red-600/90 text-white"
+                      }`}
+                    >
+                      {availabilityResult.status === "available"
+                        ? `${availabilityResult.availableUnits} Available`
+                        : availabilityResult.status === "limited"
+                          ? "Only 1 Left"
+                          : "Fully Booked"}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <dl className="mt-6 space-y-3.5 text-xs sm:text-sm">
@@ -515,6 +636,16 @@ function ReservePage() {
                 <Row k="Check-in Date" v={checkIn || "Not selected"} />
                 <Row k="Check-out Date" v={checkOut || "Not selected"} />
                 <Row k="Occupancy" v={`${guests} Guest(s)`} />
+                <Row k="Room Rate Subtotal" v={naira(baseSubtotal)} />
+                {availabilityResult?.priceBreakdown && n > 0 && (
+                  <>
+                    <Row k="VAT (7.5%)" v={naira(availabilityResult.priceBreakdown.vat)} />
+                    <Row
+                      k="State Tourism Levy (5.0%)"
+                      v={naira(availabilityResult.priceBreakdown.tourismLevy)}
+                    />
+                  </>
+                )}
                 <Row k="Complimentary Breakfast" v="Included Daily" />
                 <Row k="Internet" v="High-Speed Wi-Fi" />
 
@@ -522,10 +653,12 @@ function ReservePage() {
                   <div>
                     <dt className="eyebrow text-muted-foreground">Estimated Total</dt>
                     <span className="text-[0.65rem] text-muted-foreground block">
-                      {n > 0 ? `${n} nights × ${naira(room.rate)}` : "1 night preview"}
+                      {n > 0 ? `${n} night stay + statutory levies` : "1 night preview"}
                     </span>
                   </div>
-                  <dd className="font-display text-2xl text-foreground">{naira(total)}</dd>
+                  <dd className="font-display text-2xl text-foreground">
+                    {naira(calculatedTotal)}
+                  </dd>
                 </div>
               </dl>
 
@@ -559,6 +692,14 @@ function ReservePage() {
           </div>
         )}
       </section>
+
+      {/* Booking Success Dialog Modal */}
+      <BookingSuccessModal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        data={confirmedData}
+        onResetForm={handleReset}
+      />
     </>
   );
 }

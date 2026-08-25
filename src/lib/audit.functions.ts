@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 import { firestoreRest } from "./firebase-server";
 import { z } from "zod";
+import { assertStaff } from "./auth-roles";
 
 /** Actions the browser is allowed to record itself (everything else is logged server-side). */
 const CLIENT_ACTIONS = [
@@ -38,15 +39,6 @@ export const recordAuditEvent = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
-
-async function assertStaff(context: { userId: string }) {
-  const roles = await firestoreRest.list<{ user_id: string; role: string }>("user_roles");
-  const userRoles = roles.filter((r) => r.user_id === context.userId).map((r) => r.role);
-  if (!userRoles.includes("admin") && !userRoles.includes("staff")) {
-    if (roles.length === 0) return;
-    throw new Error("Forbidden: staff access only.");
-  }
-}
 
 export const listAuditLogs = createServerFn({ method: "GET" })
   .middleware([requireFirebaseAuth])

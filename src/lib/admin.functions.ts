@@ -2,22 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 import { firestoreRest } from "./firebase-server";
 import { z } from "zod";
+import { assertStaff, getUserStaffStatus } from "./auth-roles";
 
 type Ctx = {
   userId: string;
   claims: Record<string, unknown>;
 };
-
-async function assertStaff(context: Ctx) {
-  // In Firebase, check user_roles collection or claims
-  const roles = await firestoreRest.list<{ user_id: string; role: string }>("user_roles");
-  const userRoles = roles.filter((r) => r.user_id === context.userId).map((r) => r.role);
-  if (!userRoles.includes("admin") && !userRoles.includes("staff")) {
-    // If no roles exist yet at all in the database, allow bootstrap
-    if (roles.length === 0) return;
-    throw new Error("Forbidden: staff access only.");
-  }
-}
 
 async function audit(
   context: Ctx,
@@ -40,17 +30,8 @@ async function audit(
 export const getStaffStatus = createServerFn({ method: "GET" })
   .middleware([requireFirebaseAuth])
   .handler(async ({ context }) => {
-    const roles = await firestoreRest.list<{ id: string; user_id: string; role: string }>(
-      "user_roles",
-    );
-    const userRoles = roles.filter((r) => r.user_id === context.userId).map((r) => r.role);
-    const adminCount = roles.filter((r) => r.role === "admin").length;
-    return {
-      isStaff: userRoles.includes("admin") || userRoles.includes("staff") || roles.length === 0,
-      isAdmin: userRoles.includes("admin") || roles.length === 0,
-      canBootstrap: adminCount === 0,
-      email: (context.claims["email"] as string) ?? "",
-    };
+    const email = (context.claims["email"] as string) ?? "";
+    return await getUserStaffStatus(context.userId, email);
   });
 
 /** Grants admin to the first signed-in user when the hotel has no admin yet. */
@@ -294,7 +275,7 @@ export const saveRoom = createServerFn({ method: "POST" })
         units: z.number().int().min(0).max(500),
         occupancy: z.string().max(60),
         size: z.string().max(60),
-        image_url: z.string().max(500),
+        image_url: z.string().max(10_000_000),
         features: z.array(z.string().max(80)).max(12),
         published: z.boolean(),
       })

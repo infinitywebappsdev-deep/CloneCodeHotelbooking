@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { MediaImagePicker } from "@/components/admin/MediaImagePicker";
 
 export const Route = createFileRoute("/_authenticated/admin/rooms")({
   component: RoomsPage,
@@ -74,21 +75,15 @@ function RoomEditor({ room, onSaved }: { room: RoomRecord; onSaved: () => void }
   });
 
   return (
-    <Card className="grid gap-4 p-5 lg:grid-cols-[220px_1fr]">
-      <div>
-        {draft.image_url ? (
-          <img
-            src={draft.image_url}
-            alt={draft.name}
-            className="h-36 w-full rounded-lg object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-36 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">
-            No image
-          </div>
-        )}
-        <div className="mt-3 flex items-center gap-2">
+    <Card className="p-5 space-y-4">
+      <div className="flex items-center justify-between border-b border-border/60 pb-3">
+        <div>
+          <h3 className="font-serif text-lg font-semibold">{draft.name || "Unnamed Room"}</h3>
+          <p className="text-xs text-muted-foreground">
+            {draft.size} • {draft.occupancy}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
           <Switch
             checked={draft.published}
             onCheckedChange={(published) => setDraft({ ...draft, published })}
@@ -100,79 +95,87 @@ function RoomEditor({ room, onSaved }: { room: RoomRecord; onSaved: () => void }
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label>Name</Label>
-            <Input
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>Rate per night (₦)</Label>
-            <Input
-              type="number"
-              value={draft.rate}
-              onChange={(e) => setDraft({ ...draft, rate: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <Label>Units available</Label>
-            <Input
-              type="number"
-              value={draft.units}
-              onChange={(e) => setDraft({ ...draft, units: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <Label>Occupancy</Label>
-            <Input
-              value={draft.occupancy}
-              onChange={(e) => setDraft({ ...draft, occupancy: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>Size</Label>
-            <Input
-              value={draft.size}
-              onChange={(e) => setDraft({ ...draft, size: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>Image URL</Label>
-            <Input
-              value={draft.image_url}
-              onChange={(e) => setDraft({ ...draft, image_url: e.target.value })}
-            />
-          </div>
-        </div>
+      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <div>
-          <Label>Description</Label>
-          <Textarea
-            rows={2}
-            value={draft.blurb}
-            onChange={(e) => setDraft({ ...draft, blurb: e.target.value })}
+          <MediaImagePicker
+            value={draft.image_url}
+            onChange={(image_url) => setDraft({ ...draft, image_url })}
+            label="Room Photography"
+            placeholder="/images/... or https://..."
+            compact
           />
         </div>
-        <div>
-          <Label>Features (comma separated)</Label>
-          <Input
-            value={draft.features.join(", ")}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                features: e.target.value
-                  .split(",")
-                  .map((f) => f.trim())
-                  .filter(Boolean),
-              })
-            }
-          />
+
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Room Title</Label>
+              <Input
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Rate per night (₦)</Label>
+              <Input
+                type="number"
+                value={draft.rate}
+                onChange={(e) => setDraft({ ...draft, rate: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label>Units available</Label>
+              <Input
+                type="number"
+                value={draft.units}
+                onChange={(e) => setDraft({ ...draft, units: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label>Occupancy</Label>
+              <Input
+                value={draft.occupancy}
+                onChange={(e) => setDraft({ ...draft, occupancy: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Floor Size</Label>
+              <Input
+                value={draft.size}
+                onChange={(e) => setDraft({ ...draft, size: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label>Description</Label>
+            <Textarea
+              rows={2}
+              value={draft.blurb}
+              onChange={(e) => setDraft({ ...draft, blurb: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <Label>Features (comma separated)</Label>
+            <Input
+              value={draft.features.join(", ")}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  features: e.target.value
+                    .split(",")
+                    .map((f) => f.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+          </div>
+
+          <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>
+            {save.isPending ? "Saving…" : "Save room"}
+          </Button>
         </div>
-        <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>
-          {save.isPending ? "Saving…" : "Save room"}
-        </Button>
       </div>
     </Card>
   );

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { MediaImagePicker } from "@/components/admin/MediaImagePicker";
 
 export const Route = createFileRoute("/_authenticated/admin/branding")({
   component: BrandingPage,
@@ -65,33 +66,21 @@ function BrandingPage() {
         <h2 className="font-serif text-xl">Identity</h2>
         {field("hotel_name", "Hotel name")}
         {field("tagline", "Tagline")}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label>Logo</Label>
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => e.target.files?.[0] && upload(e.target.files[0], "logo_url")}
-            />
-            {current.logo_url && (
-              <img src={current.logo_url} alt="Logo preview" className="mt-2 h-14 object-contain" />
-            )}
-          </div>
-          <div>
-            <Label>Favicon</Label>
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) => e.target.files?.[0] && upload(e.target.files[0], "favicon_url")}
-            />
-            {current.favicon_url && (
-              <img
-                src={current.favicon_url}
-                alt="Favicon preview"
-                className="mt-2 h-8 w-8 object-contain"
-              />
-            )}
-          </div>
+        <div className="space-y-3">
+          <MediaImagePicker
+            value={current.logo_url}
+            onChange={(url) => setDraft({ ...current, logo_url: url })}
+            label="Hotel Logo"
+            placeholder="/images/... or data:... or https://..."
+            compact
+          />
+          <MediaImagePicker
+            value={current.favicon_url}
+            onChange={(url) => setDraft({ ...current, favicon_url: url })}
+            label="Website Favicon"
+            placeholder="/favicon.ico or /favicon.png or https://..."
+            compact
+          />
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           {field("color_primary", "Primary", "color")}
