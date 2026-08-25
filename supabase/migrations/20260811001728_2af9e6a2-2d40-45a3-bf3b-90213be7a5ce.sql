@@ -1,0 +1,1 @@
+delete from public.faqs where question = 'QA test question?';

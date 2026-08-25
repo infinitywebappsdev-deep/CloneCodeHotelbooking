@@ -1,0 +1,188 @@
+{
+  "entities": {
+    "site_settings": {
+      "title": "SiteSettings",
+      "description": "Hotel branding, contact details, color palette, and general settings",
+      "type": "object",
+      "properties": {
+        "hotel_name": { "type": "string", "maxLength": 120 },
+        "tagline": { "type": "string", "maxLength": 200 },
+        "logo_url": { "type": "string", "maxLength": 10000 },
+        "favicon_url": { "type": "string", "maxLength": 10000 },
+        "color_primary": { "type": "string", "maxLength": 10 },
+        "color_accent": { "type": "string", "maxLength": 10 },
+        "color_background": { "type": "string", "maxLength": 10 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "whatsapp": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "format": "email", "maxLength": 120 },
+        "address": { "type": "string", "maxLength": 200 },
+        "paystack_url": { "type": "string", "maxLength": 400 },
+        "updated_at": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["hotel_name"]
+    },
+    "rooms": {
+      "title": "Room",
+      "description": "Hotel room inventory, rates, occupancy, and description",
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string", "maxLength": 60 },
+        "name": { "type": "string", "maxLength": 100 },
+        "rate": { "type": "number" },
+        "qty": { "type": "number" },
+        "occupancy": { "type": "string", "maxLength": 40 },
+        "size": { "type": "string", "maxLength": 40 },
+        "image": { "type": "string", "maxLength": 10000 },
+        "blurb": { "type": "string", "maxLength": 500 },
+        "features": { "type": "array" },
+        "active": { "type": "boolean" },
+        "updated_at": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["slug", "name", "rate"]
+    },
+    "faqs": {
+      "title": "FAQ",
+      "description": "Frequently asked questions and answers for guests",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string", "maxLength": 300 },
+        "answer": { "type": "string", "maxLength": 2000 },
+        "category": { "type": "string", "maxLength": 60 },
+        "order": { "type": "number" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["question", "answer"]
+    },
+    "gallery_images": {
+      "title": "GalleryImage",
+      "description": "Hotel photography and visual gallery items",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "maxLength": 10000 },
+        "caption": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 60 },
+        "order": { "type": "number" }
+      },
+      "required": ["url"]
+    },
+    "pages": {
+      "title": "Page",
+      "description": "CMS dynamic pages and published content",
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 200 },
+        "published": { "type": "boolean" },
+        "nav_label": { "type": "string", "maxLength": 60 },
+        "live": { "type": "object" },
+        "draft": { "type": "object" },
+        "updated_at": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["slug", "title"]
+    },
+    "reservations": {
+      "title": "Reservation",
+      "description": "Guest reservation records",
+      "type": "object",
+      "properties": {
+        "reference": { "type": "string", "maxLength": 40 },
+        "room_id": { "type": "string", "maxLength": 80 },
+        "room_name": { "type": "string", "maxLength": 120 },
+        "guest_name": { "type": "string", "maxLength": 120 },
+        "guest_email": { "type": "string", "format": "email", "maxLength": 120 },
+        "guest_phone": { "type": "string", "maxLength": 40 },
+        "check_in": { "type": "string", "maxLength": 40 },
+        "check_out": { "type": "string", "maxLength": 40 },
+        "guests_count": { "type": "number" },
+        "total_amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "checked_in", "checked_out", "cancelled"], "maxLength": 40 },
+        "payment_status": { "type": "string", "enum": ["pending", "paid", "refunded", "failed"], "maxLength": 40 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "created_at": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["reference", "guest_name", "check_in", "check_out"]
+    },
+    "guest_messages": {
+      "title": "GuestMessage",
+      "description": "Messages exchanged between guests and hotel reception",
+      "type": "object",
+      "properties": {
+        "reservation_id": { "type": "string", "maxLength": 80 },
+        "sender": { "type": "string", "maxLength": 60 },
+        "sender_id": { "type": "string", "maxLength": 128 },
+        "body": { "type": "string", "maxLength": 2000 },
+        "created_at": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["reservation_id", "body"]
+    },
+    "audit_logs": {
+      "title": "AuditLog",
+      "description": "System operational and change audit logs",
+      "type": "object",
+      "properties": {
+        "actor_id": { "type": "string", "maxLength": 128 },
+        "actor_email": { "type": "string", "maxLength": 120 },
+        "action": { "type": "string", "maxLength": 100 },
+        "entity": { "type": "string", "maxLength": 100 },
+        "entity_id": { "type": "string", "maxLength": 100 },
+        "details": { "type": "object" },
+        "created_at": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["action", "created_at"]
+    },
+    "testimonials": {
+      "title": "Testimonial",
+      "description": "Guest reviews, ratings, and testimonials",
+      "type": "object",
+      "properties": {
+        "guest_name": { "type": "string", "maxLength": 120 },
+        "location": { "type": "string", "maxLength": 120 },
+        "rating": { "type": "number" },
+        "content": { "type": "string", "maxLength": 1000 },
+        "stay_type": { "type": "string", "maxLength": 100 },
+        "verified": { "type": "boolean" },
+        "created_at": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["guest_name", "rating", "content"]
+    }
+  },
+  "firestore": {
+    "/site_settings/{docId}": {
+      "schema": "site_settings",
+      "description": "Public read, admin write hotel settings"
+    },
+    "/rooms/{docId}": {
+      "schema": "rooms",
+      "description": "Public read, admin write rooms collection"
+    },
+    "/faqs/{docId}": {
+      "schema": "faqs",
+      "description": "Public read, admin write FAQs"
+    },
+    "/gallery_images/{docId}": {
+      "schema": "gallery_images",
+      "description": "Public read, admin write gallery images"
+    },
+    "/testimonials/{docId}": {
+      "schema": "testimonials",
+      "description": "Public read and guest submission reviews"
+    },
+    "/pages/{docId}": {
+      "schema": "pages",
+      "description": "CMS published pages and drafts"
+    },
+    "/reservations/{docId}": {
+      "schema": "reservations",
+      "description": "Guest and admin reservations"
+    },
+    "/guest_messages/{docId}": {
+      "schema": "guest_messages",
+      "description": "Guest and staff communication"
+    },
+    "/audit_logs/{docId}": {
+      "schema": "audit_logs",
+      "description": "Admin operational audit trail"
+    }
+  }
+}

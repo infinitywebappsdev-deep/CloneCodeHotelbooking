@@ -1,0 +1,6 @@
+{
+  "name": "Remix Banky hotel Website Google Ai",
+  "description": "Imported from GitHub: bankyhotelado-lgtm/hello-world-creator-6955 google ai Remix",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
